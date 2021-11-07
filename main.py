@@ -3,7 +3,7 @@ os.chdir('D:\\GitHub\\DS3')
 import pandas as pd
 import numpy as np
 import math
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -29,6 +29,9 @@ from matplotlib.collections import LineCollection
 import pydotplus
 import io
 from IPython.display import Image
+import torch
+from torch import nn, optim
+import torch.nn.functional as F
 
 from data_read import My_Data_Read
 from preprocessing import missing_value_variable, missing_value_sample, drop_missing, fill_missing, str_to_float,\
@@ -41,6 +44,18 @@ from MachineLearning import Multiple_Regression, Elastic_Net, Linear_Discriminan
                             Decision_Tree, Random_Forest
 
 
+
+# pytorchでGPU使用可能か確認
+torch.cuda.is_available()
+# Pytorchのバージョン確認
+print(torch.__version__)
+# PyTorchで使用できるGPU（デバイス）数の確認
+torch.cuda.device_count()
+# デフォルトのGPU番号（インデックス）取得
+torch.cuda.current_device()
+# GPUの名称およびCUDA Compute Capability
+torch.cuda.get_device_name()
+torch.cuda.get_device_capability()
 
 # データ表示数のセッティング
 pd.set_option('display.max_columns', None) # 全列表示されるようにPandasの設定を変更する
@@ -294,6 +309,243 @@ Y_C = pd.DataFrame(str_list, columns=[target_name + ' Category'])
 
 df_RF_GSresult, df_RF_train, df_RF_oob, df_RF_test = Random_Forest(X, Y_C, target_name, train_data_1)
 
+
+
+##################### DNN #####################
+# 説明変数名リスト
+explanatory_list = columns_list[0:11]
+# 目的変数名
+target_name = columns_list[11]
+
+x_train = train_data_1.loc[:,explanatory_list].values
+t_train = train_data_1.loc[:,target_name].values
+x_test = test_data_1.values
+
+x_train, x_valid, t_train, t_valid = train_test_split(x_train, t_train, test_size=0.2, random_state=42)
+
+scaler = MinMaxScaler()
+x_train = scaler.fit_transform(x_train)
+x_valid = scaler.transform(x_valid)
+x_test = scaler.transform(x_test)
+
+class TrainDataset(torch.utils.data.Dataset):
+    def __init__(self, x_train, t_train):
+        self.x_train = x_train
+        self.t_train = t_train
+        
+    def __len__(self):
+        return len(self.x_train)
+        
+    def __getitem__(self, idx):
+        return torch.tensor(self.x_train[idx], dtype=torch.float), \
+            torch.tensor(self.t_train[idx], dtype=torch.float)
+    
+class TestDataset(torch.utils.data.Dataset):
+    def __init__(self, x_test):
+        self.x_test = x_test
+        
+    def __len__(self):
+        return len(self.x_test)
+        
+    def __getitem__(self, idx):
+        return torch.tensor(self.x_test[idx], dtype=torch.float)
+
+train_dataset = TrainDataset(x_train, t_train)
+valid_dataset = TrainDataset(x_valid, t_valid)
+test_dataset = TestDataset(x_test)
+
+class L1_penalty(nn.Module):
+    def __init__(self, loss_fn, model, lambda_):
+        super().__init__()
+        self.loss_fn = loss_fn
+        self.model = model
+        self.lambda_ = lambda_
+    def __call__(self,pred,t,vis_penalty = False):
+        loss_ = self.loss_fn(pred,t)
+        # ノルム計算
+        penalty = 0.0
+        for param in self.model.parameters():
+            penalty += torch.sum(torch.abs(param))
+        penalty *= self.lambda_
+        
+        if(vis_penalty):
+            print(penalty)
+        return loss_ + penalty
+
+class L2_penalty(nn.Module):
+    def __init__(self, loss_fn, model, lambda_):
+        super().__init__()
+        self.loss_fn = loss_fn
+        self.model = model
+        self.lambda_ = lambda_
+    def __call__(self,pred,t,vis_penalty = False):
+        loss_ = self.loss_fn(pred,t)
+        # ノルム計算
+        penalty = 0.0
+        for param in self.model.parameters():
+            penalty += torch.sum(param ** 2) ## L2正則化の場合の実装例
+        penalty *= self.lambda_
+        
+        if(vis_penalty):
+            print(penalty)
+        return loss_ + penalty
+
+DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+print(DEVICE)
+
+# DataLoaderの作成
+BATCH_SIZE = 32
+train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+valid_loader = torch.utils.data.DataLoader(dataset=valid_dataset, batch_size=BATCH_SIZE)
+test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE)
+
+# ニューラルネットの定義
+class MLP(nn.Module):
+    def __init__(self, num_features):
+        super().__init__()
+        self.layer_1 = nn.Linear(num_features, 32)  # 入力層
+        self.layer_2 = nn.Linear(32, 256)  # 中間層
+        self.layer_3 = nn.Linear(256, 256)  # 中間層
+        self.layer_4 = nn.Linear(256, 16)  # 中間層
+        self.layer_out = nn.Linear(16, 1)  # 出力層
+        # self.bn1 = nn.BatchNorm1d(32)
+        # self.bn2 = nn.BatchNorm1d(256)
+        # self.bn3 = nn.BatchNorm1d(16)
+        
+    def forward(self, inputs):
+        x = self.layer_1(inputs)
+        # x = self.bn1(x)
+        x = F.relu(x)
+        # x = F.leaky_relu(x)
+        # x = F.rrelu(x)
+        # x = torch.tanh(x)
+        x = F.dropout(x, p=0.5)#, training=self.training)
+        x = self.layer_2(x)
+        # x = self.bn2(x)
+        x = F.relu(x)
+        # x = F.leaky_relu(x)
+        # x = F.rrelu(x)
+        # x = torch.tanh(x)
+        x = F.dropout(x, p=0.5)#, training=self.training)
+        x = self.layer_3(x)
+        # x = self.bn2(x)
+        x = F.relu(x)
+        # x = F.leaky_relu(x)
+        # x = F.rrelu(x)
+        # x = torch.tanh(x)
+        x = F.dropout(x, p=0.5)#, training=self.training)
+        x = self.layer_4(x)
+        # x = self.bn3(x)
+        x = F.relu(x)
+        # x = F.leaky_relu(x)
+        # x = F.rrelu(x)
+        # x = torch.tanh(x)
+        x = self.layer_out(x)
+        return x
+
+NUM_FEATURES = 11
+mlp = MLP(NUM_FEATURES)
+mlp.to(DEVICE)
+
+# 損失関数の定義
+loss_fn = nn.MSELoss()
+loss_fn = L1_penalty(loss_fn, mlp, 1e-4)
+# loss_fn = L2_penalty(loss_fn, mlp, 1e-4)
+
+# 学習率
+LEARNING_RATE_list = [0.05]
+
+# 学習の実行
+# 精度向上ポイント: エポック数の大小
+NUM_EPOCHS = 2000
+
+earlystopping_rate_list = [100]
+
+best_train_loss = 1000
+best_valid_loss = 1000
+best_list = [0,0,0,0]
+
+for LEARNING_RATE in LEARNING_RATE_list:
+    # オプティマイザの定義
+    # optimizer = optim.Adam(mlp.parameters(), lr=LEARNING_RATE)
+    # optimizer = optim.AdamW(mlp.parameters(), lr=LEARNING_RATE)
+    # optimizer = optim.Adagrad(mlp.parameters(), lr=LEARNING_RATE)
+    optimizer = optim.SGD(mlp.parameters(), lr=LEARNING_RATE)
+    # optimizer = optim.RMSprop(mlp.parameters(), lr=LEARNING_RATE)
+    # optimizer = optim.Adadelta(mlp.parameters(), lr=LEARNING_RATE)
+    
+    for earlystopping_rate in earlystopping_rate_list:
+        earlystopping_count = 0
+        print('LEARNING_RATE: ', LEARNING_RATE, ' earlystopping_rate: ', earlystopping_rate)
+        
+        loss_stats = {'train': [], 'valid': []}
+        for e in range(1, NUM_EPOCHS+1):
+            # 訓練
+            train_epoch_loss = 0
+            mlp.train()
+            for x, t in train_loader:
+                x, t = x.to(DEVICE), t.unsqueeze(1).to(DEVICE)
+                optimizer.zero_grad()  # 勾配の初期化
+                pred = mlp(x)  # 予測の計算(順伝播)
+                loss = loss_fn(pred, t)  # 損失関数の計算
+                loss.backward()  # 勾配の計算（逆伝播）
+                optimizer.step()  # 重みの更新
+                train_epoch_loss += loss.item()
+
+            # 検証  
+            with torch.no_grad():
+                valid_epoch_loss = 0
+                mlp.eval()
+                for x, t in valid_loader:
+                    x, t = x.to(DEVICE), t.unsqueeze(1).to(DEVICE)
+                    pred = mlp(x)  # 予測の計算(順伝播)
+                    loss = loss_fn(pred, t)  # 損失関数の計算
+                    valid_epoch_loss += loss.item()
+
+            loss_stats['train'].append(train_epoch_loss/len(train_loader))
+            loss_stats['valid'].append(valid_epoch_loss/len(valid_loader))                              
+
+            if e % 50 == 0 or e == NUM_EPOCHS:
+                print(f'Epoch {e+0:03}: | Train Loss: {train_epoch_loss/len(train_loader):.5f} | Val Loss: {valid_epoch_loss/len(valid_loader):.5f}')
+
+            # ベストスコアの処理
+            if valid_epoch_loss/len(valid_loader) < best_valid_loss:
+                best_valid_loss = valid_epoch_loss/len(valid_loader)
+                best_train_loss = train_epoch_loss/len(train_loader)
+                best_list = [LEARNING_RATE, earlystopping_rate, best_train_loss, best_valid_loss]
+                best_loss_stats = loss_stats
+                # torch.save(mlp.state_dict(), '/root/userspace/best_model.pth')
+
+            # Early Stoppingの処理
+            if e == 1:
+                earlystopping_score = valid_epoch_loss/len(valid_loader)
+
+            if valid_epoch_loss/len(valid_loader) < earlystopping_score:
+                earlystopping_score = valid_epoch_loss/len(valid_loader)
+                earlystopping_count = 0
+            else:
+                earlystopping_score = earlystopping_score
+                earlystopping_count += 1
+
+            if earlystopping_count >= earlystopping_rate:
+                print(f'Epoch {e+0:03}: | Train Loss: {train_epoch_loss/len(train_loader):.5f} | Val Loss: {valid_epoch_loss/len(valid_loader):.5f} "Early Stopping"')
+                break
+
+print()
+print(best_list)
+
+# 推論の実行
+mlp.eval()
+preds = []
+for x in test_loader:
+    x = x.to(DEVICE)
+    pred = mlp(x)
+    pred = pred.squeeze()
+    preds.extend(pred.tolist())
+
+submission = pd.Series(preds, name='quality')
+submission.to_csv('/root/userspace/submission1_pred.csv', 
+                  header=True, index_label='id')
 
 
 
