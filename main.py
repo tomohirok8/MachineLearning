@@ -175,7 +175,7 @@ df_md = outlier_MT(train_data_1, columns_list, explanatory_num, target_num)
 
 ##################### 1クラスSVMで外れ値検出 #####################
 # 使う変数の列名リストを作成
-explanatory_num = 6
+explanatory_num = 5
 OCSVM_list = [columns_list[explanatory_num],columns_list[target_num]]
 gamma_best = outlier_OCSVM1(train_data_1, OCSVM_list)
 print(gamma_best)
