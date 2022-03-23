@@ -6,10 +6,10 @@ import math
 # 欠損値の確認：変数軸
 def missing_value_variable(df):
     null_column = pd.concat([pd.DataFrame(df.isnull().sum(), columns={'The Number of Null'}),
-                         pd.DataFrame(df.isnull().sum()/df.shape[0]*100, columns={'Null Percentage'}),
-                         pd.DataFrame(df.mean(), columns={'Mean'}),
-                         pd.DataFrame(df.median(), columns={'Median'})
-                         ],
+                            pd.DataFrame(df.isnull().sum()/df.shape[0]*100, columns={'Null Percentage'}),
+                            pd.DataFrame(df.mean(), columns={'Mean'}),
+                            pd.DataFrame(df.median(), columns={'Median'})
+                            ],
                         axis=1, sort=False)
     print(null_column)
     
@@ -26,12 +26,12 @@ def missing_value_variable(df):
 # 欠損値の確認：サンプル軸
 def missing_value_sample(df):
     null_row = pd.concat([pd.DataFrame(df.isnull().sum(axis = 1).value_counts(sort = False), columns = {'The Number of Row'}),
-                    pd.DataFrame(df.isnull().sum(axis = 1).value_counts(sort = False)/df.shape[0]*100, columns = {'Row Percentage'})],
-                    axis = 1)
+                        pd.DataFrame(df.isnull().sum(axis = 1).value_counts(sort = False)/df.shape[0]*100, columns = {'Row Percentage'})],
+                        axis = 1)
     null_row.index.names = ['The Number of Null']
     null_row = null_row.reset_index()
     null_row = pd.concat([null_row,pd.DataFrame(null_row.iloc[:, 0]/df.shape[1]*100).rename(columns = {'The Number of Null':'Null Percentage'})],
-                       axis = 1).iloc[:, [0, 3, 1, 2]]
+                        axis = 1).iloc[:, [0, 3, 1, 2]]
     null_row.sort_values('The Number of Null')
     print(null_row)
 

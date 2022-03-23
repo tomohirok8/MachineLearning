@@ -10,10 +10,10 @@ class My_Data_Read:
         return train_data, test_data
     
     def RedWineQuality():
-        x_train = pd.read_csv('data/RedWineQuality/train.csv')
-        x_test = pd.read_csv('data/RedWineQuality/test.csv')
+        train_data = pd.read_csv('data/RedWineQuality/train.csv')
+        test_data = pd.read_csv('data/RedWineQuality/test.csv')
         
-        return x_train, x_test
+        return train_data, test_data
 
 
 

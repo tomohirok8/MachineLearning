@@ -50,7 +50,7 @@ def plot_target_other_mahalanobis(df, n, t):
         plt.ylim(xy.iloc[:, 1].min()*scale_min, xy.iloc[:, 1].max()*scale_max)
         # マハラノビス距離の計算：メッシュグリッド
         xx, yy = np.meshgrid(np.linspace(plt.xlim()[0], plt.xlim()[1], 500),
-                             np.linspace(plt.ylim()[0], plt.ylim()[1], 500))
+                                np.linspace(plt.ylim()[0], plt.ylim()[1], 500))
         zz = np.c_[xx.ravel(), yy.ravel()]
         grid_mahal = xy_cov.mahalanobis(zz)
         grid_mahal_reshape = grid_mahal.reshape(xx.shape)

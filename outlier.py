@@ -63,8 +63,8 @@ def outlier_MT(df, columns_list, e_N, t_N):
     
     # 外れ値特定
     df_md = pd.concat([df.loc[:,[columns_list[e_N],columns_list[t_N]]],
-                       pd.DataFrame(md, columns=['Mahalanobis distance'])],
-                      axis=1)
+                        pd.DataFrame(md, columns=['Mahalanobis distance'])],
+                        axis=1)
     # for j in range(N):
     #     if md[j] >= 2.448:
     #         print((j+1),df.iloc[j,e_N],df.iloc[j,t_N],md[j])
@@ -92,7 +92,8 @@ def outlier_MT(df, columns_list, e_N, t_N):
 
 
 ####### 1クラスSVMで外れ値検出 #######
-def outlier_OCSVM(df, OCSVM_list):
+# グリッドサーチ実行
+def outlier_OCSVM1(df, OCSVM_list):
     X = df.loc[:,OCSVM_list]
     
     # 多変量連関図で生データを吟味
@@ -103,7 +104,7 @@ def outlier_OCSVM(df, OCSVM_list):
     X_std = sc.fit_transform(X)
     
     # ハイパーパラメータgammaの最適化 
-    # log10単位で大きく変えて最適範囲を探す　gamma(0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000)
+    # log10単位で大きく変えて最適範囲を探す
     np_gammas = [0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000]
     df2 = pd.DataFrame()
     for np_gamma in np_gammas:
@@ -112,9 +113,13 @@ def outlier_OCSVM(df, OCSVM_list):
         pred = mdl.predict(X_std)
         pred_err = [i<0 for i in pred]
         temp = pd.DataFrame({'gamma':np_gamma ,'偽陽性率':sum(pred_err)/len(pred_err)},index=[np_gamma,])
-        print("gamma:{0}".format(np_gamma), "異常件数:{0}".format(sum(pred_err)), "偽陽性率:{0}".format(sum(pred_err)/len(pred_err)))
+        print("gamma:{0}".format(np_gamma), "異常件数:{0}".format(sum(pred_err)),
+                "偽陽性率:{0}".format(sum(pred_err)/len(pred_err)))
         df2 = pd.concat([df2,temp])
     
+    gamma_best_index = df2['偽陽性率'].idxmin()
+    gamma_best = df2.loc[gamma_best_index, 'gamma']
+
     #　gammaと偽陽性率の推移を可視化
     x = df2['gamma']
     y = df2['偽陽性率']
@@ -124,13 +129,13 @@ def outlier_OCSVM(df, OCSVM_list):
     plt.ylabel('rate')
     plt.grid()
     plt.hlines([0.05], df2['gamma'].min() ,df2['gamma'].max() , "red")
-    plt.show() 
-    
+    plt.show()
+
     # ハイパーパラメータgammaの変化による偽陽性率の推移を確認
     # 上で見つけた範囲で小刻みにgammaを変え、ズレの小さいgammaを探す
     # gamma 0.01から、0.01刻みで 2まで増やして偽陽性率の推移を確認する
     df3 = pd.DataFrame()
-    ini = 0.01
+    ini = gamma_best
     times = 200
     for i in range(times):
         mdl = svm.OneClassSVM(nu=0.0001, kernel="rbf",gamma=(i+1)*ini)
@@ -140,7 +145,7 @@ def outlier_OCSVM(df, OCSVM_list):
         temp = pd.DataFrame({'gamma':(i+1)*ini ,'偽陽性率':sum(pred_err)/len(pred_err)},index=[i,])
         df3 = pd.concat([df3,temp])
     
-    #gamma による偽陽性率の推移を可視化する
+    # gamma による偽陽性率の推移を可視化する
     x = df3['gamma']
     y = df3['偽陽性率']
     plt.plot(x, y)
@@ -149,9 +154,18 @@ def outlier_OCSVM(df, OCSVM_list):
     plt.grid()
     plt.hlines([0.05], df3['gamma'].min() ,df3['gamma'].max() , "red")
     plt.show()
+
+    return gamma_best
     
+
+
+# パラメータ最適値で1クラスSVM実行
+def outlier_OCSVM2(df, OCSVM_list, gamma_best):
+    X = df.loc[:,OCSVM_list]
+    sc = StandardScaler()
+    X_std = sc.fit_transform(X)
     # 作成モデルでデータを予測する
-    mdl = svm.OneClassSVM(nu=0.05, kernel="rbf",gamma=0.05)
+    mdl = svm.OneClassSVM(nu=0.05, kernel="rbf",gamma=gamma_best)
     mdl.fit(X_std)
     pred = mdl.predict(X_std)
     
@@ -177,19 +191,21 @@ def outlier_OCSVM(df, OCSVM_list):
     plt.show()
     
     # gamma値の違いによるグラフの変化
-    gammna_list = np.array([0.01,0.1,1])
+    gammna_list = np.array([gamma_best/1000, gamma_best/100, gamma_best/10,
+                            gamma_best/2, gamma_best, gamma_best*5,
+                            gamma_best*10, gamma_best*100, gamma_best*1000])
     
-    fig = plt.figure(figsize = (15, 3))
+    fig = plt.figure(figsize = (15, 9))
     ax = [ ]
-    for i in np.arange(1,4):
-        ax_add = fig.add_subplot(1, 3, i)
+    for i in np.arange(1,len(gammna_list)+1):
+        ax_add = fig.add_subplot(3, 3, i)
         ax.append(ax_add)
     # mesh
     x_min, x_max = df5.iloc[:,0].min() - 1, df5.iloc[:,0].max() + 1
     y_min, y_max = df5.iloc[:,1].min() - 1, df5.iloc[:,1].max() + 1
     xx, yy = np.meshgrid(np.arange(x_min, x_max, 0.05), np.arange(y_min, y_max, 0.05))
-       
-    for i in np.arange(0, 3):
+
+    for i in np.arange(0, len(gammna_list)):
         ax[i].scatter(df5.iloc[:,0], df5.iloc[:,1])
         # 作成モデルでデータを予測する
         mdl = svm.OneClassSVM(nu=0.05, kernel="rbf",gamma=gammna_list[i])

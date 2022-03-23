@@ -33,29 +33,21 @@ import torch
 from torch import nn, optim
 import torch.nn.functional as F
 
+from sub import check_pytorch
 from data_read import My_Data_Read
 from preprocessing import missing_value_variable, missing_value_sample, drop_missing, fill_missing, str_to_float,\
-                          str_to_numeric
+                            str_to_numeric
 from analysis import plot_target_other, plot_target_other_mahalanobis, plot_hist, GraphicalLasso_correlation
-from outlier import outlier_MT, outlier_OCSVM
+from outlier import outlier_MT, outlier_OCSVM1, outlier_OCSVM2
 from classification import hierarchical_cluster_analysis, kmeans_classification, GaussianMixtureModel_classification,\
-                           PrincipalComponentAnalysis_classification
+                            PrincipalComponentAnalysis_classification
 from MachineLearning import Multiple_Regression, Elastic_Net, Linear_Discriminant_Analysis,Support_Vector_Machine,\
                             Decision_Tree, Random_Forest
 
 
 
-# pytorchでGPU使用可能か確認
-torch.cuda.is_available()
-# Pytorchのバージョン確認
-print(torch.__version__)
-# PyTorchで使用できるGPU（デバイス）数の確認
-torch.cuda.device_count()
-# デフォルトのGPU番号（インデックス）取得
-torch.cuda.current_device()
-# GPUの名称およびCUDA Compute Capability
-torch.cuda.get_device_name()
-torch.cuda.get_device_capability()
+# Pytorch環境を確認
+check_pytorch()
 
 # データ表示数のセッティング
 pd.set_option('display.max_columns', None) # 全列表示されるようにPandasの設定を変更する
@@ -70,11 +62,6 @@ columns_list = train_data.columns
 # 目的変数列名指定
 target_name = 'quality'
 
-# x_train = train_data[:, :-1]
-# t_train = train_data[:, -1]
-
-# train = train_data.fillna(train_data.median()).values
-# x_test = test_data.fillna(test_data.median()).values
 
 
 ##################### 前処理 #####################
@@ -82,6 +69,7 @@ target_name = 'quality'
 train_data.info()
 test_data.info()
 
+### 欠損値処理 ###
 # 欠損値の確認（変数軸）
 missing_variables_train = missing_value_variable(train_data)
 missing_variables_test = missing_value_variable(test_data)
@@ -91,38 +79,53 @@ missing_value_sample(train_data)
 missing_value_sample(test_data)
 
 # 欠損値の処理：データが閾値以上ある変数のみ残す＝欠損率（100%ー閾値）以上の変数を削除
-train_data_1 = drop_missing(train_data, 70)
-test_data_1 = drop_missing(test_data, 70)
+drop_missing_thresh = 70
+train_data_1 = drop_missing(train_data, drop_missing_thresh)
+test_data_1 = drop_missing(test_data, drop_missing_thresh)
 
 # 欠損のある行を埋める（変数軸）
 # mean    : 平均値で埋める
 # median  : 中央値で埋める
 # unknown : unknownで埋める
 # drop    : 欠損のある行を削除
-fill_method_train = ['mean', 'mean']
-fill_method_test = ['mean', 'mean']
+method = 'mean'
+fill_method_train = []
+for i in range(len(missing_variables_train)):
+    fill_method_train.append(method)
+fill_method_test = []
+for i in range(len(missing_variables_test)):
+    fill_method_test.append(method)
 fill_missing(train_data_1, missing_variables_train, fill_method_train)
 fill_missing(test_data_1, missing_variables_test, fill_method_test)
     
 # 目的変数が欠損している行を削除
 train_data_1.dropna(subset=[target_name], inplace=True)
 
+### 文字列処理 ###
+train_data_1.info()
+test_data_1.info()
+
 # 数値なのに文字になっているデータの復元 カンマ除外,スペース除外,空白には0を入れ,?は0にする
-str_train = ['xx']
-str_test = ['xx']
+str_train = []
+str_test = []
 str_to_float(train_data_1, str_train)
 str_to_float(test_data_1, str_test)
 
 # 数値の列すべてで数値以外のものを0に変更
-keys_train = ['xx']
-keys_test = ['xx']
+keys_train = []
+keys_test = []
 str_to_numeric(train_data_1, keys_train)
 str_to_numeric(test_data_1, keys_test)
 
 # カテゴリ変数をダミー変数化する
-train_data_1 = pd.get_dummies(train_data_1, dummy_na=True, columns=['xx'])
-test_data_1 = pd.get_dummies(test_data_1, dummy_na=True, columns=['xx'])
+dummy_train = []
+dummy_test = []
+for d in dummy_train:
+    train_data_1 = pd.get_dummies(train_data_1, dummy_na=True, columns=[d])
+for d in dummy_test:
+    test_data_1 = pd.get_dummies(test_data_1, dummy_na=True, columns=[d])
 
+### 最終回避処理 ###
 # これだけやってもまだ残っているNaNはとりあえず0で埋める
 train_data_1 = train_data_1.fillna(0)
 test_data_1 = test_data_1.fillna(0)
@@ -140,13 +143,18 @@ plt.show()
 # 各変数間の相関係数
 train_data_1.corr()
 
-# 変数の種類数と目的変数の列番号
+# 変数の種類数
 n_data = len(train_data_1.columns)
-target_num = 11 # 目的変数の列番号
+# 目的変数の列番号
+target_num = list(train_data_1.columns).index(target_name)
 
 # 目的変数と他変数の関係図
-plot_target_other(train_data_1, n_data, target_num)
-plot_target_other_mahalanobis(train_data_1, n_data, target_num) # マハラノビス距離の等高線あり
+# マハラノビス距離の等高線有無設定
+mahalanobis_use = 1
+if mahalanobis_use == 1:
+    plot_target_other_mahalanobis(train_data_1, n_data, target_num)
+else:
+    plot_target_other(train_data_1, n_data, target_num)
 
 # ヒストグラム
 plot_hist(train_data_1, n_data)
@@ -158,29 +166,35 @@ plt.show()
 
 
 ##################### MT法で外れ値検出 #####################
-# 説明変数と目的変数の列番号
-explanatory_num = 6
-target_num = target_num
+# 説明変数の列番号
+explanatory_num = 5
+# 2次元で外れ値検出
 df_md = outlier_MT(train_data_1, columns_list, explanatory_num, target_num)
 
 
 
 ##################### 1クラスSVMで外れ値検出 #####################
 # 使う変数の列名リストを作成
-OCSVM_list = [columns_list[6],columns_list[11]]
-outlier_OCSVM(train_data_1, OCSVM_list)
+explanatory_num = 6
+OCSVM_list = [columns_list[explanatory_num],columns_list[target_num]]
+gamma_best = outlier_OCSVM1(train_data_1, OCSVM_list)
+print(gamma_best)
+outlier_OCSVM2(train_data_1, OCSVM_list, gamma_best)
 
 
 
 ##################### 階層的クラスター分析で層別 #####################
 explanatory_list = columns_list[:11] # 説明変数名リスト
-df_HCA = hierarchical_cluster_analysis(train_data_1, explanatory_list, 5)
+print(explanatory_list)
+max_cluster = 5
+df_HCA = hierarchical_cluster_analysis(train_data_1, explanatory_list, max_cluster)
 
 
 
 ##################### k-means法で層別 #####################
 explanatory_list = columns_list[:11] # 説明変数名リスト
-df_kmeans = kmeans_classification(train_data_1, explanatory_list, 5)
+n_cluster = 5
+df_kmeans = kmeans_classification(train_data_1, explanatory_list, n_cluster)
 
 
 
@@ -205,13 +219,11 @@ GraphicalLasso_correlation(train_data_1, explanatory_list)
 ##################### 重回帰分析 #####################
 # 説明変数名リスト
 explanatory_list = ['fixed acidity', 'volatile acidity', 'density', 'pH', 'alcohol']
-# 目的変数名
-target_name = 'quality'
 # 説明変数と目的変数に分割
 X = train_data_1.loc[:,explanatory_list]
 Y = train_data_1.loc[:,target_name]
-
 Multiple_Regression(X, Y)
+
 
 
 ##################### 正則化（Elasticnet）回帰 #####################
@@ -226,7 +238,7 @@ Y = train_data_1.loc[:,target_name]
 prediction = Elastic_Net(X, Y)
 
 
-
+'''
 ##################### 線形判別分析 #####################
 # 説明変数名リスト
 explanatory_list = ['fixed acidity', 'volatile acidity', 'density', 'pH', 'alcohol']
@@ -309,7 +321,9 @@ Y_C = pd.DataFrame(str_list, columns=[target_name + ' Category'])
 
 df_RF_GSresult, df_RF_train, df_RF_oob, df_RF_test = Random_Forest(X, Y_C, target_name, train_data_1)
 
+'''
 
+'''
 
 ##################### DNN #####################
 # 説明変数名リスト
@@ -544,9 +558,10 @@ for x in test_loader:
     preds.extend(pred.tolist())
 
 submission = pd.Series(preds, name='quality')
-submission.to_csv('/root/userspace/submission1_pred.csv', 
+submission.to_csv('submission1_pred.csv', 
                   header=True, index_label='id')
 
 
 
 
+'''

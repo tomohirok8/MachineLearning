@@ -50,10 +50,11 @@ def Multiple_Regression(X, Y):
     plt.figure(figsize=(10,10))
     plt.scatter(Y_std_inverse, Y_pred_inverse, c='steelblue', edgecolor='white', s=70)
     plt.plot(Y_std_inverse,Y_std_inverse) # 直線描画のためY_std_inverseを利用
-    plt.title("実測-予測グラフ")
-    plt.xlabel("実測値")
-    plt.ylabel("予測値")
+    plt.title("実測-予測グラフ", fontname="MS Gothic")
+    plt.xlabel("実測値", fontname="MS Gothic")
+    plt.ylabel("予測値", fontname="MS Gothic")
     plt.grid(True)
+    plt.show()
 
 
 

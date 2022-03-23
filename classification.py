@@ -40,7 +40,7 @@ def hierarchical_cluster_analysis(df, explanatory_list, max_cluster):
     
     # クラスター毎に標準化された平均
     df3 = pd.concat([pd.DataFrame(X_std,columns=explanatory_list),
-                     pd.DataFrame(cluster,columns=['Cluster No'])],axis=1)
+                        pd.DataFrame(cluster,columns=['Cluster No'])],axis=1)
     
     # クラスター毎の平均値比較グラフを描画する
     df4 = df3.groupby('Cluster No').mean()
@@ -92,7 +92,7 @@ def kmeans_classification(df, explanatory_list, n_cluster):
     
     # クラスター毎に標準化された平均
     df2 = pd.concat([pd.DataFrame(X_std,columns=explanatory_list),
-                     pd.DataFrame(pred,columns=['Cluster No'])],axis=1)
+                        pd.DataFrame(pred,columns=['Cluster No'])],axis=1)
     
     # クラスター毎の平均値比較グラフを描画する
     df3 = df2.groupby('Cluster No').mean()
@@ -180,7 +180,7 @@ def GaussianMixtureModel_classification(df, explanatory_list):
     pred = mdl.predict(X_std)
     
     df2 = pd.concat([pd.DataFrame(X_std,columns=explanatory_list),
-                     pd.DataFrame(pred,columns=['Cluster No'])],axis=1)
+                        pd.DataFrame(pred,columns=['Cluster No'])],axis=1)
     
     # クラスター毎の平均値比較グラフを描画する
     df3 = df2.groupby('Cluster No').mean()
