@@ -482,7 +482,7 @@ def Random_Forest(X, Y_C, target_name, df):
     print('\nAccuracy(正解率)：テストデータ　= ',f'{accuracy_score(Y_test, Y_test_pred):.03f}')
     print('Recall(再現率)：テストデータ　= ',f'{recall_score(Y_test, Y_test_pred, pos_label=1):.03f}')
     print('Precision(適合率)：テストデータ　= ',f'{precision_score(Y_test, Y_test_pred, pos_label=1):.03f}')
-    print('F_measure(F値)：学習データ　= ',f'{f1_score(Y_test, Y_test_pred, pos_label=1):.03f}')
+    print('F_measure(F値)：テストデータ　= ',f'{f1_score(Y_test, Y_test_pred, pos_label=1):.03f}')
     
     return df_GS_result, df_Train, df_OOB, df_Test
 

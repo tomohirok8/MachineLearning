@@ -81,8 +81,8 @@ def outlier_MT(df, columns_list, e_N, t_N):
     # 可視化
     plt.subplot(1,1,1)
     plt.scatter(x1, x2, c="green", s=50,label="")
-    plt.xlabel("displacement")
-    plt.ylabel("horsepower")
+    plt.xlabel(df.columns[e_N])
+    plt.ylabel(df.columns[t_N])
     plt.plot(curve_c[0],curve_c[1],c="c",label="MD=2.448")
     plt.legend(loc='upper left')
     plt.show()

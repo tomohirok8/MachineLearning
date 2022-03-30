@@ -228,8 +228,6 @@ Multiple_Regression(X, Y)
 ##################### 正則化（Elasticnet）回帰 #####################
 # 説明変数名リスト
 explanatory_list = ['fixed acidity', 'volatile acidity', 'density', 'pH', 'alcohol']
-# 目的変数名
-target_name = 'quality'
 # 説明変数と目的変数に分割
 X = train_data_1.loc[:,explanatory_list]
 Y = train_data_1.loc[:,target_name]
