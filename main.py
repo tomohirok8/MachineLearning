@@ -32,6 +32,7 @@ import torch
 from torch import nn, optim
 import torch.nn.functional as F
 
+os.chdir('D:\\GitHub\\DS3')
 from sub import check_pytorch
 from data_read import My_Data_Read
 from preprocessing import missing_value_variable, missing_value_sample, drop_missing, fill_missing, str_to_float,\
@@ -50,8 +51,11 @@ check_pytorch()
 
 # データ表示数のセッティング
 pd.set_option('display.max_columns', None) # 全列表示されるようにPandasの設定を変更する
-pd.set_option('display.max_rows', None) # 全行表示されるようにPandasの設定を変更す
+pd.set_option('display.max_rows', None) # 全行表示されるようにPandasの設定を変更する
 
+
+
+############## データを読み込んで変数名を取得 ##############
 # データ読み込み
 train_data, test_data = My_Data_Read.RedWineQuality()
 
@@ -65,13 +69,144 @@ target_name = 'quality'
 explanatory_list = list(train_data.columns)
 explanatory_list.remove(target_name)
 
-print(columns_list)
-print(explanatory_list)
+
+
+############## 実行内容読み込み ##############
+df_exe = pd.read_csv('execution.csv', header=None, encoding='shift_jis')
+
+
+
+############## 結果保存ディレクトリ ##############
+savedir = 'result'
+os.makedirs(savedir, exist_ok=True)
+
+
+
+##################### 前処理 #####################
+# 読込データ情報の確認
+train_data.info()
+test_data.info()
+
+### 欠損値処理 ###
+# 欠損値がある変数を確認
+missing_variables_train = missing_value_variable(train_data)
+missing_variables_test = missing_value_variable(test_data)
+
+# データが閾値以上ある変数のみ残す＝欠損率（100%ー閾値）以上の変数を削除
+drop_missing_thresh = int(df_exe.iat[2,1])
+train_data_1 = drop_missing(train_data, drop_missing_thresh)
+test_data_1 = drop_missing(test_data, drop_missing_thresh)
+
+# 欠損のある行を埋める
+# mean    : 平均値で埋める
+# median  : 中央値で埋める
+# unknown : unknownで埋める
+# drop    : 欠損のある行を削除
+method = df_exe.iat[3,1]
+fill_method_train = []
+for i in range(len(missing_variables_train)):
+    fill_method_train.append(method)
+fill_method_test = []
+for i in range(len(missing_variables_test)):
+    fill_method_test.append(method)
+fill_missing(train_data_1, missing_variables_train, fill_method_train)
+fill_missing(test_data_1, missing_variables_test, fill_method_test)
+    
+# 目的変数が欠損している行を削除
+train_data_1.dropna(subset=[target_name], inplace=True)
+
+### 文字列処理 ###
+# 数値なのに文字になっているデータの復元 カンマ除外,スペース除外,空白には0を入れ,?は0にする
+str_train = [] # 数値が文字になっている変数名リスト
+str_test = [] # 数値が文字になっている変数名リスト
+str_to_float(train_data_1, str_train)
+str_to_float(test_data_1, str_test)
+
+# 数値の列すべてで数値以外のものを0に変更
+keys_train = [] # 数値の列にが文字が混入している変数名リスト
+keys_test = [] # 数値の列にが文字が混入している変数名リスト
+str_to_numeric(train_data_1, keys_train)
+str_to_numeric(test_data_1, keys_test)
+
+# カテゴリ変数をダミー変数化する
+dummy_train = [] # ダミー変数化する変数名リスト
+dummy_test = [] # ダミー変数化する変数名リスト
+for d in dummy_train:
+    train_data_1 = pd.get_dummies(train_data_1, dummy_na=True, columns=[d])
+for d in dummy_test:
+    test_data_1 = pd.get_dummies(test_data_1, dummy_na=True, columns=[d])
+
+# 最後の手段（NaNを0埋め）
+train_data_1 = train_data_1.fillna(0)
+test_data_1 = test_data_1.fillna(0)
+
+
+
+##################### 解析 #####################
+# 各変数の要約統計量
+train_data_1.describe()
+
+# 多変量連関図
+fig = sns.pairplot(train_data_1, height=2, aspect=16/9, plot_kws={'alpha':0.5})
+plt.show()
+fig.savefig(savedir + '/pairplot_train.png')
+
+# 各変数間の相関係数
+df_corr = train_data_1.corr()
+df_corr.to_csv(savedir + '/corr_train.csv')
+sns.heatmap(df_corr, vmax=1, vmin=-1, center=0)
+plt.savefig(savedir + '/corr_heatmap_train.png')
+
+# 目的変数と他変数の関係図
+# 変数の種類数
+n_data = len(train_data_1.columns)
+# 目的変数の列番号
+target_num = list(train_data_1.columns).index(target_name)
+
+# マハラノビス距離の等高線有無設定
+mahalanobis_use = 1
+if mahalanobis_use == 1:
+    plot_target_other_mahalanobis(train_data_1, n_data, target_num, savedir)
+else:
+    plot_target_other(train_data_1, n_data, target_num)
+
+# ヒストグラム
+plot_hist(train_data_1, n_data, savedir)
+
+# 箱ひげ図
+if df_exe.iat[9,1] == 1:
+    train_data_1.plot(kind='box', subplots=True, figsize=(15,3*(n_data//3+1)), layout=(n_data//3+1, 3))
+    plt.savefig(savedir + '/box_train.png')
+
+
+
+##################### 外れ値検出 #####################
+# 説明変数の列番号
+explanatory_list = ['fixed acidity', 'density']
+### MT法で外れ値検出 ###
+if df_exe.iat[10,1] == 1:
+    df_md_list = []
+    for expl in explanatory_list:
+        df_md = outlier_MT(train_data_1, expl, target_name, savedir)
+        df_md_list.append(df_md)
+    df_md_all = pd.concat(df_md_list, axis=1)
+    df_md_all.to_csv(savedir + '/outlier_md_train.csv', index=False)
+
+### 1クラスSVMで外れ値検出 ###
+for expl in explanatory_list:
+    OCSVM_list = [expl, target_name]
+    gamma_best = outlier_OCSVM1(train_data_1, OCSVM_list)
+    print(gamma_best)
+    outlier_OCSVM2(train_data_1, OCSVM_list, gamma_best, savedir)
 
 
 
 
-train_data_1.info()
+
+
+
+
+
 
 
 
@@ -93,6 +228,7 @@ esr = 300
 
 X_train = train_data_1[explanatory_list]
 Y_train = train_data_1[target_name]
+X_test = test_data_1
 
 # def lightGBM_binary(X_train, X_test, Y_train, test_data, rate_list, depth_list, leaves_list, min_leaf_list, esr, ID):
 start_time = datetime.datetime.now()
@@ -186,8 +322,7 @@ ax.set_xlabel('num of iteration')
 #ax.set_ylim(2, 8)
 ax.grid()
 
-# testデータの予測
-Y_pred = model.predict(X_test)
+
 
 plt.rcParams["font.family"] = "IPAexGothic"
 feature_importance = pd.DataFrame({
@@ -199,6 +334,11 @@ feature_importance = feature_importance.sort_values('importance', ascending=Fals
 plt.figure(figsize = (11, 7))
 sns.barplot(data=feature_importance, x='importance', y='feature_name')
 plt.savefig('feature_importance.png')
+
+
+# testデータの予測
+Y_pred = model.predict(X_test)
+
 
 # 提出用データを作成
 submission = pd.concat([test_data.loc[:,"id"], pd.Series(Y_pred, name='label')], axis=1)
@@ -545,122 +685,15 @@ print(calc_time)
 
 
 
-##################### 前処理 #####################
-# 読込データ情報の確認
-train_data.info()
-test_data.info()
-
-### 欠損値処理 ###
-# 欠損値の確認（変数軸）
-missing_variables_train = missing_value_variable(train_data)
-missing_variables_test = missing_value_variable(test_data)
-
-# 欠損値の確認（サンプル軸）
-missing_value_sample(train_data)
-missing_value_sample(test_data)
-
-# 欠損値の処理：データが閾値以上ある変数のみ残す＝欠損率（100%ー閾値）以上の変数を削除
-drop_missing_thresh = 70
-train_data_1 = drop_missing(train_data, drop_missing_thresh)
-test_data_1 = drop_missing(test_data, drop_missing_thresh)
-
-# 欠損のある行を埋める（変数軸）
-# mean    : 平均値で埋める
-# median  : 中央値で埋める
-# unknown : unknownで埋める
-# drop    : 欠損のある行を削除
-method = 'mean'
-fill_method_train = []
-for i in range(len(missing_variables_train)):
-    fill_method_train.append(method)
-fill_method_test = []
-for i in range(len(missing_variables_test)):
-    fill_method_test.append(method)
-fill_missing(train_data_1, missing_variables_train, fill_method_train)
-fill_missing(test_data_1, missing_variables_test, fill_method_test)
-    
-# 目的変数が欠損している行を削除
-train_data_1.dropna(subset=[target_name], inplace=True)
-
-### 文字列処理 ###
-train_data_1.info()
-test_data_1.info()
-
-# 数値なのに文字になっているデータの復元 カンマ除外,スペース除外,空白には0を入れ,?は0にする
-str_train = []
-str_test = []
-str_to_float(train_data_1, str_train)
-str_to_float(test_data_1, str_test)
-
-# 数値の列すべてで数値以外のものを0に変更
-keys_train = []
-keys_test = []
-str_to_numeric(train_data_1, keys_train)
-str_to_numeric(test_data_1, keys_test)
-
-# カテゴリ変数をダミー変数化する
-dummy_train = []
-dummy_test = []
-for d in dummy_train:
-    train_data_1 = pd.get_dummies(train_data_1, dummy_na=True, columns=[d])
-for d in dummy_test:
-    test_data_1 = pd.get_dummies(test_data_1, dummy_na=True, columns=[d])
-
-### 最終回避処理 ###
-# これだけやってもまだ残っているNaNはとりあえず0で埋める
-train_data_1 = train_data_1.fillna(0)
-test_data_1 = test_data_1.fillna(0)
 
 
 
-##################### 解析 #####################
-# 各変数の要約統計量
-train_data_1.describe()
-
-# 多変量連関図
-sns.pairplot(train_data_1, plot_kws = {'alpha':0.3})
-plt.show()
-
-# 各変数間の相関係数
-train_data_1.corr()
-
-# 変数の種類数
-n_data = len(train_data_1.columns)
-# 目的変数の列番号
-target_num = list(train_data_1.columns).index(target_name)
-
-# 目的変数と他変数の関係図
-# マハラノビス距離の等高線有無設定
-mahalanobis_use = 1
-if mahalanobis_use == 1:
-    plot_target_other_mahalanobis(train_data_1, n_data, target_num)
-else:
-    plot_target_other(train_data_1, n_data, target_num)
-
-# ヒストグラム
-plot_hist(train_data_1, n_data)
-
-# 箱ひげ図
-train_data_1.plot(kind='box', subplots=True, figsize=(15, 3*(n_data//3+1)), layout=(n_data//3+1, 3))
-plt.show()
 
 
 
-##################### MT法で外れ値検出 #####################
-# 説明変数の列番号
-explanatory_num = 5
-# 2次元で外れ値検出
-df_md = outlier_MT(train_data_1, columns_list, explanatory_num, target_num)
 
 
 
-##################### 1クラスSVMで外れ値検出 #####################
-# 使う変数の列名リストを作成
-explanatory_num = 5
-OCSVM_list = [columns_list[explanatory_num],columns_list[target_num]]
-gamma_best = outlier_OCSVM1(train_data_1, OCSVM_list)
-print(gamma_best)
-outlier_OCSVM2(train_data_1, OCSVM_list, gamma_best)
 
 
 

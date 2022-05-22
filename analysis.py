@@ -14,7 +14,7 @@ import networkx as nx
 
 
 # 目的変数と他変数の関係図
-def plot_target_other(df, n, t):
+def plot_target_other(df, n, t, savedir):
     fig = plt.figure(figsize = (15, 5*(n//3+1)))
     ax = [ ]
     for i in np.arange(1,n+1):
@@ -27,11 +27,12 @@ def plot_target_other(df, n, t):
         ax[i].grid(True)
         ax[i].legend()
     plt.show()
+    fig.savefig(savedir + '/target_explanatory_train.png')
 
 
 
 # 目的変数と他変数の関係図：マハラノビス距離の等高線あり
-def plot_target_other_mahalanobis(df, n, t):
+def plot_target_other_mahalanobis(df, n, t, savedir):
     fig = plt.figure(figsize = (15, 5*(n//3+1)))
     ax = [ ]
     for i in np.arange(1, n+1):
@@ -58,26 +59,28 @@ def plot_target_other_mahalanobis(df, n, t):
         xy_mahal_mean = xy_mahal.mean()
         xy_mahal_std = xy_mahal.std()
         levels = [xy_mahal_mean, xy_mahal_mean+xy_mahal_std, xy_mahal_mean+2*xy_mahal_std, xy_mahal_mean+3*xy_mahal_std]
-        ax[i].contour(xx, yy, grid_mahal_reshape, levels,cmap = plt.cm.jet, linestyles = 'solid') 
-        ax[i].scatter(df.iloc[:,t], df.iloc[:,i], label = df.columns[i])
+        ax[i].contour(xx, yy, grid_mahal_reshape, levels ,cmap=plt.cm.jet, linestyles='solid') 
+        ax[i].scatter(df.iloc[:,t], df.iloc[:,i], label=df.columns[i])
         ax[i].set_title(df.columns[i])
         ax[i].set_xlabel(df.columns[t])
         ax[i].set_ylabel(df.columns[i])
         ax[i].grid(True)
         ax[i].legend()
     plt.show()
+    fig.savefig(savedir + '/target_explanatory_train.png')
 
 
 
 # ヒストグラム
-def plot_hist(df, n):
+def plot_hist(df, n, savedir):
     fig = plt.figure(figsize = (15, 3*(n//3+1)))
     ax = [ ]
     for i in np.arange(1,n+1):
         ax_add = fig.add_subplot(n//3+1, 3, i)
         ax.append(ax_add)
     # グラフ引数の指定
-    bins = [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10] # デフォルト：10
+    bins = [10] * n # デフォルト：10
+    # bins = [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10] # デフォルト：10
     # グラフ描画
     for i in np.arange(0, n):
         ax[i].hist(df.iloc[:, i], bins=bins[i], label=df.columns[i])
@@ -85,6 +88,7 @@ def plot_hist(df, n):
         ax[i].grid(True)
         ax[i].legend()
     plt.show()
+    fig.savefig(savedir + '/hist_train.png')
 
 
 
