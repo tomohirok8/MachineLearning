@@ -16,7 +16,7 @@ def outlier_MT(df, e_N, t_N, savedir):
     x2 = df.loc[:,t_N]
     
     # 多変量連関図で生データを吟味
-    sns.pairplot(x)
+    sns.pairplot(x, height=3, aspect=16/9)
     
     # 各データの平均値を求め、平均値を引き算する
     divide = 2       # 状態量の数=使う変数

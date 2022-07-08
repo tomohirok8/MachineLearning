@@ -147,7 +147,7 @@ test_data_1 = test_data_1.fillna(0)
 train_data_1.describe()
 
 # 多変量連関図
-fig = sns.pairplot(train_data_1, height=2, aspect=16/9, plot_kws={'alpha':0.5})
+fig = sns.pairplot(train_data_1, height=3, aspect=16/9, plot_kws={'alpha':0.5})
 plt.show()
 fig.savefig(savedir + '/pairplot_train.png')
 
@@ -201,9 +201,70 @@ for expl in explanatory_list:
 
 
 
+##################### 層別 #####################
+#### 階層的クラスター分析 ####
+explanatory_list = columns_list[:11] # 説明変数名リスト
+print(explanatory_list)
+max_cluster = 5
+df_HCA = hierarchical_cluster_analysis(train_data_1, explanatory_list, max_cluster)
+
+### k-means法で層別 ###
+explanatory_list = columns_list[:11] # 説明変数名リスト
+n_cluster = 5
+df_kmeans = kmeans_classification(train_data_1, explanatory_list, n_cluster)
+
+### 混合ガウス分布で層別 ###
+explanatory_list = columns_list[:11] # 説明変数名リスト
+df_GMM = GaussianMixtureModel_classification(train_data_1, explanatory_list)
+
+### 主成分分析 ###
+explanatory_list = columns_list[:11] # 説明変数名リスト
+PrincipalComponentAnalysis_classification(train_data_1, explanatory_list)
+
+### Graphical Lassoで相関分析 ###
+explanatory_list = ['fixed acidity', 'volatile acidity', 'density', 'pH', 'alcohol', 'quality'] # 説明変数名リスト
+GraphicalLasso_correlation(train_data_1, explanatory_list)
 
 
 
+##################### 回帰 #####################
+### 重回帰分析 ###
+# 説明変数名リスト
+explanatory_list = ['fixed acidity', 'volatile acidity', 'density', 'pH', 'alcohol']
+# 説明変数と目的変数に分割
+X = train_data_1.loc[:,explanatory_list]
+Y = train_data_1.loc[:,target_name]
+Multiple_Regression(X, Y)
+
+### 正則化（Elasticnet）回帰 ###
+# 説明変数名リスト
+explanatory_list = ['fixed acidity', 'volatile acidity', 'density', 'pH', 'alcohol']
+# 説明変数と目的変数に分割
+X = train_data_1.loc[:,explanatory_list]
+Y = train_data_1.loc[:,target_name]
+prediction = Elastic_Net(X, Y)
+
+
+
+##################### 機械学習 #####################
+### 線形判別分析 ###
+# 説明変数名リスト
+explanatory_list = ['fixed acidity', 'volatile acidity', 'density', 'pH', 'alcohol']
+# 目的変数名
+target_name = 'quality'
+# 説明変数と目的変数に分割
+X = train_data_1.loc[:,explanatory_list]
+Y = train_data_1.loc[:,target_name]
+# Yをカテゴリ変数に置き換える
+str_list = []
+for s in Y:
+    if s > 5 :
+        str_list.append(1)
+    else:
+        str_list.append(0)
+Y_C = pd.DataFrame(str_list, columns=[target_name + ' Category'])
+
+df_LDA_train, df_LDA_test = Linear_Discriminant_Analysis(X, Y_C, target_name, train_data_1)
 
 
 
@@ -697,78 +758,27 @@ print(calc_time)
 
 
 
-##################### 階層的クラスター分析で層別 #####################
-explanatory_list = columns_list[:11] # 説明変数名リスト
-print(explanatory_list)
-max_cluster = 5
-df_HCA = hierarchical_cluster_analysis(train_data_1, explanatory_list, max_cluster)
 
 
 
-##################### k-means法で層別 #####################
-explanatory_list = columns_list[:11] # 説明変数名リスト
-n_cluster = 5
-df_kmeans = kmeans_classification(train_data_1, explanatory_list, n_cluster)
 
 
 
-##################### 混合ガウス分布で層別 #####################
-explanatory_list = columns_list[:11] # 説明変数名リスト
-df_GMM = GaussianMixtureModel_classification(train_data_1, explanatory_list)
 
 
 
-##################### 主成分分析 #####################
-explanatory_list = columns_list[:11] # 説明変数名リスト
-PrincipalComponentAnalysis_classification(train_data_1, explanatory_list)
 
 
 
-##################### Graphical Lassoで相関分析 #####################
-explanatory_list = ['fixed acidity', 'volatile acidity', 'density', 'pH', 'alcohol', 'quality'] # 説明変数名リスト
-GraphicalLasso_correlation(train_data_1, explanatory_list)
 
 
 
-##################### 重回帰分析 #####################
-# 説明変数名リスト
-explanatory_list = ['fixed acidity', 'volatile acidity', 'density', 'pH', 'alcohol']
-# 説明変数と目的変数に分割
-X = train_data_1.loc[:,explanatory_list]
-Y = train_data_1.loc[:,target_name]
-Multiple_Regression(X, Y)
 
 
-
-##################### 正則化（Elasticnet）回帰 #####################
-# 説明変数名リスト
-explanatory_list = ['fixed acidity', 'volatile acidity', 'density', 'pH', 'alcohol']
-# 説明変数と目的変数に分割
-X = train_data_1.loc[:,explanatory_list]
-Y = train_data_1.loc[:,target_name]
-
-prediction = Elastic_Net(X, Y)
 
 
 '''
-##################### 線形判別分析 #####################
-# 説明変数名リスト
-explanatory_list = ['fixed acidity', 'volatile acidity', 'density', 'pH', 'alcohol']
-# 目的変数名
-target_name = 'quality'
-# 説明変数と目的変数に分割
-X = train_data_1.loc[:,explanatory_list]
-Y = train_data_1.loc[:,target_name]
-# Yをカテゴリ変数に置き換える
-str_list = []
-for s in Y:
-    if s > 5 :
-        str_list.append(1)
-    else:
-        str_list.append(0)
-Y_C = pd.DataFrame(str_list, columns=[target_name + ' Category'])
 
-df_LDA_train, df_LDA_test = Linear_Discriminant_Analysis(X, Y_C, target_name, train_data_1)
 
 
 
