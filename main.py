@@ -400,7 +400,7 @@ for rate in rate_list:
                         valid_sets=[lgb_dataset_trn, lgb_dataset_val], 
                         num_boost_round=10000, 
                         early_stopping_rounds=esr, 
-                        verbose_eval=100,
+                        # verbose_eval=100,
                         evals_result=result_dic
                         )
 
@@ -434,34 +434,43 @@ print('Best score: {}'.format(best_score))
 print('Best parameters: {}'.format(best_parameters))
 
 
-params = {'objective' : 'rmse',
-            'learning_rate' : best_parameters["rate"],
-            'max_depth' : best_parameters["depth"],
-            }
+params = {'objective' : 'multiclass',
+        'num_class' : 5, # 多クラスのクラス数を指定
+        # 'objective' : 'regression',
+        # 'objective' : 'binary', 
+        'metric': {'multi_error'},
+        # 'metric': {'mae'},
+        # 'metric': {'mse'},
+        # 'metric': {'binary_logloss'},
+        # 'metric': {'binary_error'}, # 評価指標 : 誤り率(= 1-正答率)
+        'early_stopping_rounds' : esr,   # early_stopping 回数指定
+        'learning_rate' : best_parameters["rate"],
+        'max_depth' : best_parameters["depth"],
+        'num_leaves': best_parameters["leaves"],
+        'min_data_in_leaf': best_parameters["min_leaf"]
+        }
 
 result_dic ={}
 model = lgb.train(
         params=params, 
         train_set=lgb_dataset_trn, 
         valid_sets=[lgb_dataset_trn, lgb_dataset_val], 
-        feval=mape_func, 
         num_boost_round=10000, 
         early_stopping_rounds=esr, 
-        verbose_eval=100,
+        # verbose_eval=100,
         evals_result=result_dic
         )
 
 # 学習経過を表示
 result_df = pd.DataFrame(result_dic['training']).add_prefix('train_').join(pd.DataFrame(result_dic['valid_1']).add_prefix('valid_'))
 fig, ax = plt.subplots(figsize=(11, 7))
-result_df[['train_mape', 'valid_mape']].plot(ax=ax)
-ax.set_ylabel('MAPE [%]')
+result_df[['train_multi_error', 'valid_multi_error']].plot(ax=ax)
+ax.set_ylabel('multi error')
 ax.set_xlabel('num of iteration')
 #ax.set_ylim(2, 8)
 ax.grid()
 
-
-
+# 特徴量の重要度出力
 plt.rcParams["font.family"] = "IPAexGothic"
 feature_importance = pd.DataFrame({
     'feature_name' : model.feature_name(),
@@ -512,16 +521,6 @@ def cal_acc(y_true, y_pred):
     acc = accuracy_score(y_true, y_pred)
     return acc
     
-
-best_result_dic ={}
-model_best = lgb.train(
-                params=params_best, 
-                train_set=lgb_dataset_trn, 
-                valid_sets=[lgb_dataset_trn, lgb_dataset_val], 
-                num_boost_round=10000, 
-                verbose_eval=100,
-                evals_result=best_result_dic
-                )
 
 # 学習経過を表示
 result_df = pd.DataFrame(best_result_dic['training']).add_prefix('train_')\
