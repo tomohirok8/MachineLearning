@@ -266,7 +266,62 @@ Y_C = pd.DataFrame(str_list, columns=[target_name + ' Category'])
 
 df_LDA_train, df_LDA_test = Linear_Discriminant_Analysis(X, Y_C, target_name, train_data_1)
 
+###SVM ###
+# 説明変数名リスト
+explanatory_list = ['fixed acidity', 'volatile acidity', 'density', 'pH', 'alcohol']
+# 目的変数名
+target_name = 'quality'
+# 説明変数と目的変数に分割
+X = train_data_1.loc[:,explanatory_list]
+Y = train_data_1.loc[:,target_name]
+# Yをカテゴリ変数に置き換える
+str_list = []
+for s in Y:
+    if s > 5 :
+        str_list.append(1)
+    else:
+        str_list.append(0)
+Y_C = pd.DataFrame(str_list, columns=[target_name + ' Category'])
 
+df_SVM_train, df_SVM_test = Support_Vector_Machine(X, Y_C, target_name, explanatory_list, train_data_1, 'rbf')
+
+### 決定木 ###
+# 説明変数名リスト
+explanatory_list = ['fixed acidity', 'volatile acidity', 'density', 'pH', 'alcohol']
+# 目的変数名
+target_name = 'quality'
+# 説明変数と目的変数に分割
+X = train_data_1.loc[:,explanatory_list]
+Y = train_data_1.loc[:,target_name]
+# Yをカテゴリ変数に置き換える
+str_list = []
+for s in Y:
+    if s > 5 :
+        str_list.append(1)
+    else:
+        str_list.append(0)
+Y_C = pd.DataFrame(str_list, columns=[target_name + ' Category'])
+
+df_DT_GSresult, df_DT_train, df_DT_test = Decision_Tree(X, Y_C, target_name, train_data_1)
+
+### ランダムフォレスト ###
+# 説明変数名リスト
+explanatory_list = ['fixed acidity', 'volatile acidity', 'density', 'pH', 'alcohol']
+# 目的変数名
+target_name = 'quality'
+# 説明変数と目的変数に分割
+X = train_data_1.loc[:,explanatory_list]
+Y = train_data_1.loc[:,target_name]
+# Yをカテゴリ変数に置き換える
+str_list = []
+for s in Y:
+    if s > 5 :
+        str_list.append(1)
+    else:
+        str_list.append(0)
+Y_C = pd.DataFrame(str_list, columns=[target_name + ' Category'])
+
+df_RF_GSresult, df_RF_train, df_RF_oob, df_RF_test = Random_Forest(X, Y_C, target_name, train_data_1)
 
 
 
@@ -289,7 +344,6 @@ esr = 300
 
 X_train = train_data_1[explanatory_list]
 Y_train = train_data_1[target_name]
-X_test = test_data_1
 
 # def lightGBM_binary(X_train, X_test, Y_train, test_data, rate_list, depth_list, leaves_list, min_leaf_list, esr, ID):
 start_time = datetime.datetime.now()
@@ -317,41 +371,64 @@ def mape_func(y_pred, data):
     mape = calc_mape(y_true, y_pred)
     return 'mape', mape, False
 
-best_score = 100
+best_score = 0
 best_parameters = {}
 for rate in rate_list:
     for depth in depth_list:
-        params = {'objective' : 'rmse',
-                    'learning_rate' : rate,
-                    'max_depth' : depth,
-                    }
+        for leaves in leaves_list:
+            for min_leaf in min_leaf_list:
+                params = {'objective' : 'multiclass',
+                            'num_class' : 5, # 多クラスのクラス数を指定
+                            # 'objective' : 'regression',
+                            # 'objective' : 'binary', 
+                            'metric': {'multi_error'},
+                            # 'metric': {'mae'},
+                            # 'metric': {'mse'},
+                            # 'metric': {'binary_logloss'},
+                            # 'metric': {'binary_error'}, # 評価指標 : 誤り率(= 1-正答率)
+                            'early_stopping_rounds' : esr,   # early_stopping 回数指定
+                            'learning_rate' : rate,
+                            'max_depth' : depth,
+                            'num_leaves': leaves,
+                            'min_data_in_leaf': min_leaf
+                            }
 
-        result_dic ={}
-        model = lgb.train(
-                params=params, 
-                train_set=lgb_dataset_trn, 
-                valid_sets=[lgb_dataset_trn, lgb_dataset_val], 
-                feval=mape_func, 
-                num_boost_round=10000, 
-                early_stopping_rounds=esr, 
-                verbose_eval=100,
-                evals_result=result_dic
-                )
+                result_dic ={}
+                model = lgb.train(
+                        params=params, 
+                        train_set=lgb_dataset_trn, 
+                        valid_sets=[lgb_dataset_trn, lgb_dataset_val], 
+                        num_boost_round=10000, 
+                        early_stopping_rounds=esr, 
+                        verbose_eval=100,
+                        evals_result=result_dic
+                        )
 
-        train_pred = model.predict(X_train)
-        train_mape = calc_mape(Y_train.values, train_pred)
-        val_pred = model.predict(X_val)
-        val_mape = calc_mape(Y_val.values, val_pred)
-        print("rate  = ", rate)
-        print("depth = ", depth)
-        print(f'train mape : {train_mape:.3f}%')
-        print(f'valid mape : {val_mape:.3f}%')
-        
-        # 最も良いスコアのパラメータとスコアを更新
-        score = val_mape
-        if score < best_score:
-            best_score = score
-            best_parameters = {'rate' : rate, 'depth' : depth}
+                # train_pred = model.predict(X_train, num_iteration=model.best_iteration)
+                train_pred_prob = model.predict(X_train, num_iteration=model.best_iteration)
+                # train_pred = np.where(train_pred_prob < 0.5, 0, 1) # 0.5より小さい場合0 ,そうでない場合1を返す
+                train_pred = np.argmax(train_pred_prob, axis=1) # 最尤と判断したクラス
+                train_acc = accuracy_score(Y_train.values, train_pred)
+                # val_pred = model.predict(X_val, num_iteration=model.best_iteration)
+                val_pred_prob = model.predict(X_val, num_iteration=model.best_iteration)
+                # val_pred = np.where(val_pred_prob < 0.5, 0, 1)
+                val_pred = np.argmax(val_pred_prob, axis=1) # 最尤と判断したクラス
+                val_acc = accuracy_score(Y_val.values, val_pred)
+                print("rate  = ", rate)
+                print("depth = ", depth)
+                print("leaves = ", leaves)
+                print("min_leaf = ", min_leaf)
+                print(f'train acc : {train_acc:.3f}%')
+                print(f'valid acc : {val_acc:.3f}%')
+                
+                # 最も良いスコアのパラメータとスコアを更新
+                score = val_acc
+                if score > best_score:
+                    best_score = score
+                    best_parameters = {'rate' : rate,
+                                         'depth' : depth,
+                                         'leaves' : leaves,
+                                         'min_leaf' : min_leaf}
 
 print('Best score: {}'.format(best_score))
 print('Best parameters: {}'.format(best_parameters))
@@ -397,14 +474,6 @@ sns.barplot(data=feature_importance, x='importance', y='feature_name')
 plt.savefig('feature_importance.png')
 
 
-# testデータの予測
-Y_pred = model.predict(X_test)
-
-
-# 提出用データを作成
-submission = pd.concat([test_data.loc[:,"id"], pd.Series(Y_pred, name='label')], axis=1)
-submission.to_csv('submission.csv', header=False, index=False)
-
 calc_time = datetime.datetime.now() - start_time
 print(calc_time)
 
@@ -438,72 +507,11 @@ def cal_auc(y_true, y_pred):
     AreaUnderCurve = auc(fpr, tpr)
     return AreaUnderCurve
 
+
 def cal_acc(y_true, y_pred):
     acc = accuracy_score(y_true, y_pred)
     return acc
     
-best_score = 0
-best_parameters = {}
-for rate in rate_list:
-    for depth in depth_list:
-        for leaves in leaves_list:
-            for min_leaf in min_leaf_list:
-                params = {'objective' : 'regression',
-                            # 'objective' : 'regression',
-                            # 'objective' : 'binary',          # 二値分類問題
-                            # 'metric': {'binary_error'}, # 評価指標 : 誤り率(= 1-正答率)
-                            # 'metric': 'auc',                 # AUC の最大化を目指す
-                            # 'metric': {'binary_logloss'},
-                            'metric': {'rmse'},
-                            'num_iterations' : 1000,         # 最大イテレーション回数指定
-                            'early_stopping_rounds' : esr,   # early_stopping 回数指定
-                            'learning_rate' : rate,
-                            'max_depth' : depth,
-                            'num_leaves': leaves,
-                            'min_data_in_leaf': min_leaf,
-                            }
-        
-                result_dic ={}
-                model = lgb.train(
-                        params=params, 
-                        train_set=lgb_dataset_trn, 
-                        valid_sets=[lgb_dataset_trn, lgb_dataset_val], 
-                        num_boost_round=10000, 
-                        verbose_eval=100,
-                        evals_result=result_dic
-                        )
-                
-                train_pred_prob = model.predict(X_train, num_iteration=model.best_iteration)
-                train_pred = np.where(train_pred_prob < 0.5, 0, 1) # 0.5より小さい場合0 ,そうでない場合1を返す
-                train_acc = cal_acc(Y_train.values, train_pred)
-                val_pred_prob = model.predict(X_val, num_iteration=model.best_iteration)
-                val_pred = np.where(val_pred_prob < 0.5, 0, 1)
-                val_acc = cal_acc(Y_val.values, val_pred)
-                print("rate  = ", rate)
-                print("depth = ", depth)
-                print("leaves = ", leaves)
-                print("min_leaf = ", min_leaf)
-                print('train acc : ', train_acc)
-                print('valid acc : ', val_acc)
-                
-                # 最も良いスコアのパラメータとスコアを更新
-                score = val_acc
-                if score > best_score:
-                    best_score = score
-                    best_parameters = {'rate':rate, 'depth':depth, 'leaves':leaves, 'min_leaf':min_leaf}
-                    best_val_pred = val_pred
-
-print('Best score: {}'.format(best_score))
-print('Best parameters: {}'.format(best_parameters))
-
-params_best = {'objective' : 'binary',
-                'num_iterations' : 1000,
-                'early_stopping_rounds' : esr, 
-                'learning_rate' : best_parameters["rate"],
-                'max_depth' : best_parameters["depth"],
-                'num_leaves': best_parameters["leaves"],
-                'min_data_in_leaf': best_parameters["min_leaf"]
-                }
 
 best_result_dic ={}
 model_best = lgb.train(
@@ -564,140 +572,6 @@ calc_time = datetime.datetime.now() - start_time
 print(calc_time)
 
 
-kf.split(X_train, Y_train)
-
-# validの確認
-def cal_auc(y_true, y_pred):
-    fpr, tpr, thresholds = metrics.roc_curve(y_true, y_pred)
-    auc = metrics.auc(fpr, tpr)
-    return auc
-
-# def cal_acc(y_true, y_pred):
-#     acc = metrics.accuracy_score(y_true, y_pred)
-#     return acc
-    
-best_score = 0
-best_parameters = {}
-for rate in rate_list:
-    for depth in depth_list:
-        for leaves in leaves_list:
-            for min_leaf in min_leaf_list:
-                score_train = []
-                score_vali = []
-                for train_index, test_index in kf.split(X_train, Y_train):
-                    # LightGBMの学習
-                    k_lgb_dataset_trn = lgb.Dataset(X_train.iloc[train_index,:], label=Y_train[train_index], categorical_feature='auto')
-                    k_lgb_dataset_val = lgb.Dataset(X_train.iloc[test_index,:], label=Y_train[test_index], categorical_feature='auto')
-                
-                    params = {'objective' : 'binary',          # 二値分類問題
-                                # 'metric': {'binary_error'}, # 評価指標 : 誤り率(= 1-正答率)
-                                # 'metric': 'auc',                 # AUC の最大化を目指す
-                                'metric': {'binary_logloss'},
-                                'num_iterations' : 1000,         # 最大イテレーション回数指定
-                                'early_stopping_rounds' : esr,   # early_stopping 回数指定
-                                'learning_rate' : rate,
-                                'max_depth' : depth,
-                                'num_leaves': leaves,
-                                'min_data_in_leaf': min_leaf,
-                                }
-            
-                    result_dic ={}
-                    model = lgb.train(
-                            params=params, 
-                            train_set=k_lgb_dataset_trn, 
-                            valid_sets=[k_lgb_dataset_trn, k_lgb_dataset_val], 
-                            num_boost_round=10000, 
-                            verbose_eval=100,
-                            evals_result=result_dic
-                            )
-                    
-                    train_pred_prob = model.predict(X_train.iloc[train_index,:], num_iteration=model.best_iteration)
-                    train_pred = np.where(train_pred_prob < 0.5, 0, 1) # 0.5より小さい場合0 ,そうでない場合1を返す
-                    train_acc = cal_auc(Y_train[train_index].values, train_pred)
-                    val_pred_prob = model.predict(X_train.iloc[test_index,:], num_iteration=model.best_iteration)
-                    val_pred = np.where(val_pred_prob < 0.5, 0, 1)
-                    val_acc = cal_auc(Y_train[test_index].values, val_pred)
-                    score_train.append(train_acc)
-                    score_vali.append(val_acc)
-                    
-                trn_score = sum(score_train) / len(score_train)
-                val_score = sum(score_vali) / len(score_vali)
-                print('train score = ', trn_score)
-                print('vali score = ', val_score)
-                print("rate  = ", rate)
-                print("depth = ", depth)
-                print("leaves = ", leaves)
-                print("min_leaf = ", min_leaf)
-                    
-                # 最も良いスコアのパラメータとスコアを更新
-                if val_score > best_score:
-                    best_score = val_score
-                    best_parameters = {'rate':rate, 'depth':depth, 'leaves':leaves, 'min_leaf':min_leaf}
-
-print('Best score: {}'.format(best_score))
-print('Best parameters: {}'.format(best_parameters))
-
-# トレーニングデータを学習用・検証用に分割
-X_trn, X_val, Y_trn, Y_val = train_test_split(X_train, Y_train, test_size=0.2, random_state=0)
-
-# LightGBMの学習
-lgb_dataset_trn = lgb.Dataset(X_trn, label=Y_trn, categorical_feature='auto')
-lgb_dataset_val = lgb.Dataset(X_val, label=Y_val, categorical_feature='auto')
-
-params_best = {'objective' : 'binary',
-                'num_iterations' : 1000,
-                'early_stopping_rounds' : esr, 
-                'learning_rate' : best_parameters["rate"],
-                'max_depth' : best_parameters["depth"],
-                'num_leaves': best_parameters["leaves"],
-                'min_data_in_leaf': best_parameters["min_leaf"]
-                }
-
-best_result_dic ={}
-model_best = lgb.train(
-                params=params_best, 
-                train_set=lgb_dataset_trn, 
-                valid_sets=[lgb_dataset_trn, lgb_dataset_val], 
-                num_boost_round=10000, 
-                verbose_eval=100,
-                evals_result=best_result_dic
-                )
-
-# 学習経過を表示
-result_df = pd.DataFrame(best_result_dic['training']).add_prefix('train_')\
-            .join(pd.DataFrame(best_result_dic['valid_1']).add_prefix('valid_'))
-fig, ax = plt.subplots(figsize=(11, 7))
-result_df[['train_binary_logloss', 'valid_binary_logloss']].plot(ax=ax)
-ax.set_ylabel('binary logloss')
-ax.set_xlabel('num of iteration')
-#ax.set_ylim(2, 8)
-ax.grid()
-fig.savefig('loss_' + str(ID) + '.png')
-
-# 特徴量の重要度出力  
-plt.rcParams["font.family"] = "IPAexGothic"
-feature_importance = pd.DataFrame({
-    'feature_name' : model_best.feature_name(),
-    'importance' : model_best.feature_importance(importance_type='gain'), 
-})
-feature_importance = feature_importance.sort_values('importance', ascending=False)
-
-plt.figure(figsize = (11, 7))
-sns.barplot(data=feature_importance, x='importance', y='feature_name')
-plt.savefig('feature_importance_' + str(ID) + '.png')
-
-
-# testデータの予測
-Y_pred_prob = model_best.predict(X_test, num_iteration=model_best.best_iteration)
-Y_pred = np.where(Y_pred_prob < 0.5, 0, 1)
-
-
-# 提出用データを作成
-submission = pd.concat([test_data.loc[:,"id"], pd.Series(Y_pred, name='label')], axis=1)
-submission.to_csv('submission_' + str(ID) + '.csv', header=False, index=False)
-
-calc_time = datetime.datetime.now() - start_time
-print(calc_time)
 
 
 
@@ -707,143 +581,6 @@ print(calc_time)
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-'''
-
-
-
-
-##################### SVM #####################
-# 説明変数名リスト
-explanatory_list = ['fixed acidity', 'volatile acidity', 'density', 'pH', 'alcohol']
-# 目的変数名
-target_name = 'quality'
-# 説明変数と目的変数に分割
-X = train_data_1.loc[:,explanatory_list]
-Y = train_data_1.loc[:,target_name]
-# Yをカテゴリ変数に置き換える
-str_list = []
-for s in Y:
-    if s > 5 :
-        str_list.append(1)
-    else:
-        str_list.append(0)
-Y_C = pd.DataFrame(str_list, columns=[target_name + ' Category'])
-
-df_SVM_train, df_SVM_test = Support_Vector_Machine(X, Y_C, target_name, explanatory_list, train_data_1, 'rbf')
-
-
-
-##################### 決定木 #####################
-# 説明変数名リスト
-explanatory_list = ['fixed acidity', 'volatile acidity', 'density', 'pH', 'alcohol']
-# 目的変数名
-target_name = 'quality'
-# 説明変数と目的変数に分割
-X = train_data_1.loc[:,explanatory_list]
-Y = train_data_1.loc[:,target_name]
-# Yをカテゴリ変数に置き換える
-str_list = []
-for s in Y:
-    if s > 5 :
-        str_list.append(1)
-    else:
-        str_list.append(0)
-Y_C = pd.DataFrame(str_list, columns=[target_name + ' Category'])
-
-df_DT_GSresult, df_DT_train, df_DT_test = Decision_Tree(X, Y_C, target_name, train_data_1)
-
-
-
-##################### ランダムフォレスト #####################
-# 説明変数名リスト
-explanatory_list = ['fixed acidity', 'volatile acidity', 'density', 'pH', 'alcohol']
-# 目的変数名
-target_name = 'quality'
-# 説明変数と目的変数に分割
-X = train_data_1.loc[:,explanatory_list]
-Y = train_data_1.loc[:,target_name]
-# Yをカテゴリ変数に置き換える
-str_list = []
-for s in Y:
-    if s > 5 :
-        str_list.append(1)
-    else:
-        str_list.append(0)
-Y_C = pd.DataFrame(str_list, columns=[target_name + ' Category'])
-
-df_RF_GSresult, df_RF_train, df_RF_oob, df_RF_test = Random_Forest(X, Y_C, target_name, train_data_1)
-
-'''
 
 '''
 
