@@ -42,7 +42,7 @@ from outlier import outlier_MT, outlier_OCSVM1, outlier_OCSVM2
 from classification import hierarchical_cluster_analysis, kmeans_classification, GaussianMixtureModel_classification,\
                             PrincipalComponentAnalysis_classification
 from MachineLearning import Multiple_Regression, Elastic_Net, Linear_Discriminant_Analysis,Support_Vector_Machine,\
-                            Decision_Tree, Random_Forest
+                            Decision_Tree, Random_Forest, Light_GBM
 
 
 
@@ -324,204 +324,18 @@ Y_C = pd.DataFrame(str_list, columns=[target_name + ' Category'])
 df_RF_GSresult, df_RF_train, df_RF_oob, df_RF_test = Random_Forest(X, Y_C, target_name, train_data_1)
 
 
+### LightGBMで学習 ###
+# 説明変数と目的変数に分割
+X = train_data_1[explanatory_list]
+Y = train_data_1[target_name]
 
-
-
-
-############## LightGBMで学習 ##############
-import lightgbm as lgb
-import datetime
-# LightGBMのグリッドサーチ
-rate_list = [0.1]#[0.05, 0.1, 0.2, 0.3, 0.4]
-depth_list = [5]#[3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
-leaves_list = [20]#[10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30]
-min_leaf_list = [2]#[1, 2, 3, 4, 5]
-# 学習回数
-esr = 300
-# 学習
-# lightGBM_rmse(X_train, X_test, Y_train, test_data, rate_list, depth_list, esr)
-# lightGBM_binary(X_train, X_test, Y_train, test_data, rate_list, depth_list, leaves_list, min_leaf_list, esr)
-
-X_train = train_data_1[explanatory_list]
-Y_train = train_data_1[target_name]
-
-# def lightGBM_binary(X_train, X_test, Y_train, test_data, rate_list, depth_list, leaves_list, min_leaf_list, esr, ID):
-start_time = datetime.datetime.now()
-
-
-
-
-
-
-# トレーニングデータを学習用・検証用に分割
-X_trn, X_val, Y_trn, Y_val = train_test_split(X_train, Y_train, test_size=0.2, random_state=0)
-
-# LightGBMの学習
-lgb_dataset_trn = lgb.Dataset(X_trn, label=Y_trn, categorical_feature='auto')
-lgb_dataset_val = lgb.Dataset(X_val, label=Y_val, categorical_feature='auto')
-
-# validの確認
-def calc_mape(y_true, y_pred):
-    data_num = len(y_true)
-    mape = (np.sum(np.abs(y_pred-y_true)/y_true)/data_num)*100
-    return mape
-
-def mape_func(y_pred, data):
-    y_true = data.get_label()
-    mape = calc_mape(y_true, y_pred)
-    return 'mape', mape, False
-
-best_score = 0
-best_parameters = {}
-for rate in rate_list:
-    for depth in depth_list:
-        for leaves in leaves_list:
-            for min_leaf in min_leaf_list:
-                params = {'objective' : 'multiclass',
-                            'num_class' : 5, # 多クラスのクラス数を指定
-                            # 'objective' : 'regression',
-                            # 'objective' : 'binary', 
-                            'metric': {'multi_error'},
-                            # 'metric': {'mae'},
-                            # 'metric': {'mse'},
-                            # 'metric': {'binary_logloss'},
-                            # 'metric': {'binary_error'}, # 評価指標 : 誤り率(= 1-正答率)
-                            'early_stopping_rounds' : esr,   # early_stopping 回数指定
-                            'learning_rate' : rate,
-                            'max_depth' : depth,
-                            'num_leaves': leaves,
-                            'min_data_in_leaf': min_leaf
-                            }
-
-                result_dic ={}
-                model = lgb.train(
-                        params=params, 
-                        train_set=lgb_dataset_trn, 
-                        valid_sets=[lgb_dataset_trn, lgb_dataset_val], 
-                        num_boost_round=10000, 
-                        early_stopping_rounds=esr, 
-                        # verbose_eval=100,
-                        evals_result=result_dic
-                        )
-
-                # train_pred = model.predict(X_train, num_iteration=model.best_iteration)
-                train_pred_prob = model.predict(X_train, num_iteration=model.best_iteration)
-                # train_pred = np.where(train_pred_prob < 0.5, 0, 1) # 0.5より小さい場合0 ,そうでない場合1を返す
-                train_pred = np.argmax(train_pred_prob, axis=1) # 最尤と判断したクラス
-                train_acc = accuracy_score(Y_train.values, train_pred)
-                # val_pred = model.predict(X_val, num_iteration=model.best_iteration)
-                val_pred_prob = model.predict(X_val, num_iteration=model.best_iteration)
-                # val_pred = np.where(val_pred_prob < 0.5, 0, 1)
-                val_pred = np.argmax(val_pred_prob, axis=1) # 最尤と判断したクラス
-                val_acc = accuracy_score(Y_val.values, val_pred)
-                print("rate  = ", rate)
-                print("depth = ", depth)
-                print("leaves = ", leaves)
-                print("min_leaf = ", min_leaf)
-                print(f'train acc : {train_acc:.3f}%')
-                print(f'valid acc : {val_acc:.3f}%')
-                
-                # 最も良いスコアのパラメータとスコアを更新
-                score = val_acc
-                if score > best_score:
-                    best_score = score
-                    best_parameters = {'rate' : rate,
-                                         'depth' : depth,
-                                         'leaves' : leaves,
-                                         'min_leaf' : min_leaf}
-
-print('Best score: {}'.format(best_score))
-print('Best parameters: {}'.format(best_parameters))
-
-
-params = {'objective' : 'multiclass',
-        'num_class' : 5, # 多クラスのクラス数を指定
-        # 'objective' : 'regression',
-        # 'objective' : 'binary', 
-        'metric': {'multi_error'},
-        # 'metric': {'mae'},
-        # 'metric': {'mse'},
-        # 'metric': {'binary_logloss'},
-        # 'metric': {'binary_error'}, # 評価指標 : 誤り率(= 1-正答率)
-        'early_stopping_rounds' : esr,   # early_stopping 回数指定
-        'learning_rate' : best_parameters["rate"],
-        'max_depth' : best_parameters["depth"],
-        'num_leaves': best_parameters["leaves"],
-        'min_data_in_leaf': best_parameters["min_leaf"]
-        }
-
-result_dic ={}
-model = lgb.train(
-        params=params, 
-        train_set=lgb_dataset_trn, 
-        valid_sets=[lgb_dataset_trn, lgb_dataset_val], 
-        num_boost_round=10000, 
-        early_stopping_rounds=esr, 
-        # verbose_eval=100,
-        evals_result=result_dic
-        )
-
-# 学習経過を表示
-result_df = pd.DataFrame(result_dic['training']).add_prefix('train_').join(pd.DataFrame(result_dic['valid_1']).add_prefix('valid_'))
-fig, ax = plt.subplots(figsize=(11, 7))
-result_df[['train_multi_error', 'valid_multi_error']].plot(ax=ax)
-ax.set_ylabel('multi error')
-ax.set_xlabel('num of iteration')
-#ax.set_ylim(2, 8)
-ax.grid()
-
-# 特徴量の重要度出力
-plt.rcParams["font.family"] = "IPAexGothic"
-feature_importance = pd.DataFrame({
-    'feature_name' : model.feature_name(),
-    'importance' : model.feature_importance(importance_type='gain'), 
-})
-feature_importance = feature_importance.sort_values('importance', ascending=False)
-
-plt.figure(figsize = (11, 7))
-sns.barplot(data=feature_importance, x='importance', y='feature_name')
-plt.savefig('feature_importance.png')
-
-
-calc_time = datetime.datetime.now() - start_time
-print(calc_time)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+Light_GBM(X, Y)
 
 
 
 
 
 '''
-
-# validの確認
-def cal_auc(y_true, y_pred):
-    fpr, tpr, thresholds = roc_curve(y_true, y_pred)
-    AreaUnderCurve = auc(fpr, tpr)
-    return AreaUnderCurve
-
-
-def cal_acc(y_true, y_pred):
-    acc = accuracy_score(y_true, y_pred)
-    return acc
-    
-
 # 学習経過を表示
 result_df = pd.DataFrame(best_result_dic['training']).add_prefix('train_')\
             .join(pd.DataFrame(best_result_dic['valid_1']).add_prefix('valid_'))
@@ -545,30 +359,7 @@ plt.grid()
 plt.show()
 fig.savefig('roc_' + str(ID) + '.png')
         
-# 特徴量の重要度出力  
-plt.rcParams["font.family"] = "IPAexGothic"
-feature_importance = pd.DataFrame({
-    'feature_name' : model_best.feature_name(),
-    'importance' : model_best.feature_importance(importance_type='gain'), 
-})
-feature_importance = feature_importance.sort_values('importance', ascending=False)
 
-plt.figure(figsize = (11, 7))
-sns.barplot(data=feature_importance, x='importance', y='feature_name')
-plt.savefig('feature_importance_' + str(ID) + '.png')
-
-
-# testデータの予測
-Y_pred_prob = model_best.predict(X_test, num_iteration=model_best.best_iteration)
-Y_pred = np.where(Y_pred_prob < 0.5, 0, 1)
-
-
-# 提出用データを作成
-submission = pd.concat([test_data.loc[:,"id"], pd.Series(Y_pred, name='label')], axis=1)
-submission.to_csv('submission_' + str(ID) + '.csv', header=False, index=False)
-
-calc_time = datetime.datetime.now() - start_time
-print(calc_time)
 
 
 
