@@ -543,11 +543,11 @@ def Light_GBM(X_train, Y_train):
                             evals_result=result_dic
                             )
 
-                    # train_pred = model.predict(X_train, num_iteration=model.best_iteration)
-                    train_pred_prob = model.predict(X_train, num_iteration=model.best_iteration)
+                    # train_pred = model.predict(X_trn, num_iteration=model.best_iteration)
+                    train_pred_prob = model.predict(X_trn, num_iteration=model.best_iteration)
                     # train_pred = np.where(train_pred_prob < 0.5, 0, 1) # 0.5より小さい場合0 ,そうでない場合1を返す
                     train_pred = np.argmax(train_pred_prob, axis=1) # 最尤と判断したクラス
-                    train_acc = accuracy_score(Y_train.values, train_pred)
+                    train_acc = accuracy_score(Y_trn.values, train_pred)
                     # val_pred = model.predict(X_val, num_iteration=model.best_iteration)
                     val_pred_prob = model.predict(X_val, num_iteration=model.best_iteration)
                     # val_pred = np.where(val_pred_prob < 0.5, 0, 1)
@@ -572,7 +572,7 @@ def Light_GBM(X_train, Y_train):
     print('Best score: {}'.format(best_score))
     print('Best parameters: {}'.format(best_parameters))
 
-
+    # 最適パラメータのモデルで学習
     params = {'objective' : 'multiclass',
             'num_class' : 5, # 多クラスのクラス数を指定
             # 'objective' : 'regression',
@@ -609,6 +609,13 @@ def Light_GBM(X_train, Y_train):
     #ax.set_ylim(2, 8)
     ax.grid()
 
+    # 予測
+    Y_pred_prob = model.predict(X_train)
+    Y_pred = np.argmax(Y_pred_prob, axis=1)
+    df_lightGBM = pd.concat([X_train, Y_train], axis=1)
+    df_lightGBM['予測'] = Y_pred
+
+
     # 特徴量の重要度出力
     feature_importance = pd.DataFrame({
                                         'feature_name' : model.feature_name(),
@@ -623,6 +630,8 @@ def Light_GBM(X_train, Y_train):
 
     calc_time = datetime.datetime.now() - start_time
     print(calc_time)
+
+    return df_lightGBM, best_parameters, feature_importance
 
 
 
