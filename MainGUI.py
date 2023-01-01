@@ -124,9 +124,6 @@ class TextEdit:
     def button1Clicked(self):
         messagebox.showinfo(root.title(), 'ありがとうございます！')
 
-
-
-
 root = Tk()
 TextEdit(root)
 root.mainloop()
