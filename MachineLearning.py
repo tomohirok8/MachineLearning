@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 from sklearn import tree
 from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LinearRegression, ElasticNet
+from sklearn.linear_model import LinearRegression, ElasticNet, Lasso
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.svm import SVC
@@ -16,6 +16,8 @@ import mglearn
 import pydotplus
 import io
 from IPython.display import Image
+import pickle
+from matplotlib import rcParams
 
 
 
