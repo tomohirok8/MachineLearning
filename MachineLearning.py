@@ -17,12 +17,9 @@ import mglearn
 import pydotplus
 import io
 from IPython.display import Image
-<<<<<<< HEAD
 import pickle
 from matplotlib import rcParams
-=======
 import lightgbm as lgb
->>>>>>> b1c29cb5d729c61ed4b3a4b352e73a71f8cc2284
 
 
 
