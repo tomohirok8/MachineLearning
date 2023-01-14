@@ -8,8 +8,81 @@ import math
 class TextEdit:
     def __init__(self, root):
         root.title(self.__class__.__name__)
-        ttk.Button(text='押してください！', command=self.button1Clicked).pack()
+        root.columnconfigure(0, weight=1)
+        root.rowconfigure(0, weight=1)
 
+
+        frame1 = Frame(root)
+        frame2 = Frame(root)
+
+        # button_1のハンドラ関数
+        def change_no2():
+            frame2.tkraise() # frame_2を前面に出す
+
+        # button_2のハンドラ関数
+        def change_no1():
+            frame1.tkraise() # frame_1を前面に出す
+        
+        # ハンドラ関数
+        def click_get():
+            messagebox.showinfo('メッセージ', var.get())
+
+        btn1 = ttk.Button(frame1, text='押してください！', command=self.button1Clicked)
+        btn2 = ttk.Button(frame1, text='押してください！2', command=self.button1Clicked)
+        btn3 = ttk.Button(frame1, text='次の画面', command=change_no2)
+        # btn1.pack(pady=20)
+
+
+
+        txt = Entry(frame1, width=20)
+        # txt.pack(pady=20)
+        # ハンドラ関数
+        def click(event):
+            messagebox.showinfo('メッセージ', txt.get())
+
+        # Labelウィジェットの生成
+        label = Label(frame1, text='ここをクリック', foreground='red')
+
+        # Labelウィジェットの配置
+        # label.pack()
+        # ハンドラ関数を設定
+        label.bind("<Button-1>", click)
+
+        action = ['選択肢1', '選択肢2', '選択肢3', '選択肢4']
+        # 選択状態を保持する変数（初期値を'選択肢1'にしている）
+        var = StringVar(value='選択肢1')
+        radio1 = Radiobutton(root, text=action[0], variable=var, value=action[0])
+        radio2 = Radiobutton(root, text=action[1], variable=var, value=action[1])
+        radio3 = Radiobutton(root, text=action[2], variable=var, value=action[2])
+        radio4 = Radiobutton(root, text=action[3], variable=var, value=action[3])
+
+        # Buttonウィジェットの生成と配置
+        btn4 = Button(frame1, text='表示', command=click_get)
+
+        # grid関数でウィジェットを配置
+        frame1.grid(row=0, column=0, sticky=NSEW)
+        btn1.grid(column=0, row=0, sticky=E)
+        txt.grid(column=1, row=0)
+        label.grid(column=2, row=0, sticky=W)
+        btn2.grid(column=0, row=1, sticky=E)
+        btn3.grid(column=1, row=1, sticky=E)
+        btn4.grid(column=2, row=1, sticky=E)
+        radio1.grid(column=0, row=2, sticky=E)
+        radio2.grid(column=1, row=2, sticky=E)
+        radio3.grid(column=2, row=2, sticky=E)
+
+
+        frame2.grid(row=0, column=0, sticky=NSEW)
+        label2 = Label(frame2, text='画面2です。')
+        button2 = Button(frame2, text='戻る',  command=change_no1)
+        label2.pack(pady=20)
+        button2.pack(pady=20)
+
+        frame1.tkraise()
+
+        
+        
+        
         self.fileTypes = [('テキストファイル', '*.txt'), ('すべてのファイル','*.*')]
         self.directory = os.getenv('HOMEDRIVE') + os.getenv('HOMEPATH') + '\\Documents'
 
@@ -126,6 +199,7 @@ class TextEdit:
 
 root = Tk()
 TextEdit(root)
+# print(root.children)
 root.mainloop()
 
 
