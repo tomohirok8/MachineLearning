@@ -27,8 +27,8 @@ class TextEdit:
         def click_get():
             messagebox.showinfo('メッセージ', var.get())
 
-        btn1 = ttk.Button(frame1, text='押してください！', command=self.button1Clicked)
-        btn2 = ttk.Button(frame1, text='押してください！2', command=self.button1Clicked)
+        btn1 = ttk.Button(frame1, text='押してください!', command=self.button1Clicked)
+        btn2 = ttk.Button(frame1, text='押してください!2', command=self.button1Clicked)
         btn3 = ttk.Button(frame1, text='次の画面', command=change_no2)
         # btn1.pack(pady=20)
 
