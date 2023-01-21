@@ -12,41 +12,59 @@ class TextEdit:
         root.rowconfigure(0, weight=1)
 
 
+        frame0 = Frame(root)
         frame1 = Frame(root)
         frame2 = Frame(root)
 
-        # button_1のハンドラ関数
-        def change_no2():
-            frame2.tkraise() # frame_2を前面に出す
-
-        # button_2のハンドラ関数
+        # 画面切り替えボタンのハンドラ関数
         def change_no1():
-            frame1.tkraise() # frame_1を前面に出す
+            frame1.tkraise() # frame1を前面に出す
+        
+        def change_no2():
+            frame2.tkraise() # frame2を前面に出す
+
+        def change_home():
+            frame0.tkraise() # frame0を前面に出す
         
         # ハンドラ関数
         def click_get():
             messagebox.showinfo('メッセージ', var.get())
+        
+        f0_btn1 = ttk.Button(frame0, text='統計解析', command=change_no1)
+        f0_btn2 = ttk.Button(frame0, text='機械学習', command=change_no2)
 
-        btn1 = ttk.Button(frame1, text='押してください!', command=self.button1Clicked)
-        btn2 = ttk.Button(frame1, text='押してください!2', command=self.button1Clicked)
-        btn3 = ttk.Button(frame1, text='次の画面', command=change_no2)
+        f1_btn2 = ttk.Button(frame1, text='戻る', command=change_home)
+
+        f2_btn2 = ttk.Button(frame2, text='戻る', command=change_home)
+
+
+        btn1 = ttk.Button(frame0, text='押してください!', command=self.button1Clicked)
+        btn2 = ttk.Button(frame0, text='押してください!2', command=self.button1Clicked)
+        btn3 = ttk.Button(frame0, text='次の画面', command=change_no2)
         # btn1.pack(pady=20)
 
 
 
-        txt = Entry(frame1, width=20)
+        txt = Entry(frame0, width=20)
         # txt.pack(pady=20)
         # ハンドラ関数
         def click(event):
             messagebox.showinfo('メッセージ', txt.get())
 
         # Labelウィジェットの生成
-        label = Label(frame1, text='ここをクリック', foreground='red')
+        f0_label1 = Label(frame0, text='データ処理', foreground='red')
+        f0_label2 = Label(frame0, text='統計解析', foreground='red')
+        f0_label3 = Label(frame0, text='機械学習', foreground='red')
+        # label = Label(frame0, text='ここをクリック', foreground='red')
+
+        f1_label1 = Label(frame1, text='統計解析', foreground='red')
+
+        f2_label1 = Label(frame2, text='機械学習', foreground='red')
 
         # Labelウィジェットの配置
         # label.pack()
         # ハンドラ関数を設定
-        label.bind("<Button-1>", click)
+        # label.bind("<Button-1>", click)
 
         action = ['選択肢1', '選択肢2', '選択肢3', '選択肢4']
         # 選択状態を保持する変数（初期値を'選択肢1'にしている）
@@ -57,28 +75,38 @@ class TextEdit:
         radio4 = Radiobutton(root, text=action[3], variable=var, value=action[3])
 
         # Buttonウィジェットの生成と配置
-        btn4 = Button(frame1, text='表示', command=click_get)
+        btn4 = Button(frame0, text='表示', command=click_get)
 
         # grid関数でウィジェットを配置
+        # 画面1
+        frame0.grid(row=0, column=0, sticky=NSEW)
+        f0_label1.grid(row=0, column=0, sticky=W)
+        f0_label2.grid(row=1, column=0, sticky=W)
+        f0_btn1.grid(row=1, column=1, sticky=E)
+        f0_label3.grid(row=2, column=0, sticky=W)
+        f0_btn2.grid(row=2, column=1, sticky=E)
+
+        # btn1.grid(row=4, column=2, sticky=E)
+        # txt.grid(row=4, column=3)
+        # label.grid(row=4, column=4, sticky=W)
+        # btn2.grid(row=5, column=0, sticky=E)
+        # btn3.grid(row=5, column=1, sticky=E)
+        # btn4.grid(row=5, column=2, sticky=E)
+        # radio1.grid(row=0, column=0, sticky=W)
+        # radio2.grid(row=0, column=1, sticky=W)
+        # radio3.grid(row=0, column=2, sticky=E)
+
+        # 画面2
         frame1.grid(row=0, column=0, sticky=NSEW)
-        btn1.grid(column=0, row=0, sticky=E)
-        txt.grid(column=1, row=0)
-        label.grid(column=2, row=0, sticky=W)
-        btn2.grid(column=0, row=1, sticky=E)
-        btn3.grid(column=1, row=1, sticky=E)
-        btn4.grid(column=2, row=1, sticky=E)
-        radio1.grid(column=0, row=2, sticky=E)
-        radio2.grid(column=1, row=2, sticky=E)
-        radio3.grid(column=2, row=2, sticky=E)
+        f1_label1.grid(row=0, column=0, sticky=W)
+        f1_btn2.grid(row=1, column=0, sticky=E)
 
-
+        # 画面3
         frame2.grid(row=0, column=0, sticky=NSEW)
-        label2 = Label(frame2, text='画面2です。')
-        button2 = Button(frame2, text='戻る',  command=change_no1)
-        label2.pack(pady=20)
-        button2.pack(pady=20)
+        f2_label1.grid(row=0, column=0, sticky=W)
+        f2_btn2.grid(row=1, column=0, sticky=E)
 
-        frame1.tkraise()
+        frame0.tkraise()
 
         
         
