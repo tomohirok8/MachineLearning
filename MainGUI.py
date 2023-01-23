@@ -11,9 +11,6 @@ class TextEdit:
         root.columnconfigure(0, weight=1)
         root.rowconfigure(0, weight=1)
 
-        self.trainFilePath = 'trainデータのパス'
-        self.testFilePath = 'testデータのパス'
-
         frame0 = Frame(root)
         frame1 = Frame(root)
         frame2 = Frame(root)
@@ -67,8 +64,8 @@ class TextEdit:
         f1_label1 = Label(frame1, text='データ読み込み(trainとtestが別ファイル)', foreground='red')
         f1_label2 = Label(frame1, text='trainデータのパス', foreground='blue')
         f1_label3 = Label(frame1, text='testデータのパス', foreground='blue')
-        f1_label4 = Label(frame1, text=self.trainFilePath, foreground='black')
-        f1_label5 = Label(frame1, text=self.testFilePath, foreground='black')
+        self.f1_label4 = Label(frame1, text='trainデータのパス', foreground='black')
+        self.f1_label5 = Label(frame1, text='testデータのパス', foreground='black')
         f2_label1 = Label(frame2, text='統計解析', foreground='red')
         f3_label1 = Label(frame3, text='機械学習', foreground='red')
 
@@ -111,13 +108,13 @@ class TextEdit:
 
         # 画面1
         frame1.grid(row=0, column=0, sticky=NSEW)
-        f1_label1.grid(row=0, column=0, sticky=W)
+        f1_label1.grid(row=0, column=0, columnspan=2, sticky=W)
         f1_label2.grid(row=1, column=0, sticky=W)
         f1_btn1.grid(row=1, column=1, sticky=W)
-        f1_label4.grid(row=1, column=2, sticky=W)
+        self.f1_label4.grid(row=1, column=2, sticky=W)
         f1_label3.grid(row=2, column=0, sticky=W)
         f1_btn2.grid(row=2, column=1, sticky=W)
-        f1_label5.grid(row=2, column=2, sticky=W)
+        self.f1_label5.grid(row=2, column=2, sticky=W)
         f1_btn5.grid(row=5, column=0, sticky=E)
 
         # 画面2
@@ -145,6 +142,7 @@ class TextEdit:
             cp.read(self.__class__.__name__ + '.ini')
             clientHeight = cp['Client']['Height']
             clientWidth = cp['Client']['Width']
+            self.directory =  cp['File']['Directory']
         except:
             print(self.__class__.__name__ + ':Use default value(s)', file=sys.stderr)
         
@@ -197,37 +195,43 @@ class TextEdit:
         self.text.delete('1.0', 'end')
 
     def trainFileOpen(self):
-        filename = filedialog.askopenfilename(filetypes=self.fileTypes, initialdir=self.directory)
-        if not filename:
+        filepath = filedialog.askopenfilename(filetypes=self.fileTypes, initialdir=self.directory)
+        if not filepath:
             return
         
-        filepath = ''
-        f = open(filename, 'r')
-        filepath = f.read()
+        data = ''
+        f = open(filepath, 'r')
+        data = f.read()
         f.close()
 
-        if filepath == '':
+        if data == '':
             messagebox.showwarning(self.__class__.__name__, 'ファイルを開けませんでした')
         else:
-            self.trainFilename = filepath
-            self.trainFilePath = filename
+            self.trainFile = data # csvファイルの中身
+            self.trainFilePath = filepath
+            self.directory = filepath
+        
+        self.f1_label4.configure(text=filepath)
+        
         
     
     def testFileOpen(self):
-        filename = filedialog.askopenfilename(filetypes=self.fileTypes, initialdir=self.directory)
-        if not filename:
+        filepath = filedialog.askopenfilename(filetypes=self.fileTypes, initialdir=self.directory)
+        if not filepath:
             return
         
-        filepath = ''
-        f = open(filename, 'r')
-        filepath = f.read()
+        data = ''
+        f = open(filepath, 'r')
+        data = f.read()
         f.close()
 
-        if filepath == '':
+        if data == '':
             messagebox.showwarning(self.__class__.__name__, 'ファイルを開けませんでした')
         else:
-            self.testFilename = filepath
-            self.testFilePath = filename
+            self.testFile = data # csvファイルの中身
+            self.testFilePath = filepath
+        
+        self.f1_label5.configure(text=filepath)
 
     def menuFileSave(self):
         self.fileSave(self.textFilename, self.isSjis)
@@ -275,7 +279,7 @@ class TextEdit:
             'Height': str(root.winfo_height()),
             'Width': str(root.winfo_width())}
         cp['File'] = {
-            'Directory': self.trainFilePath}#self.directory}
+            'Directory': self.directory}
         with open(self.__class__.__name__ + '.ini', 'w') as f:
             cp.write(f)
         root.destroy()
