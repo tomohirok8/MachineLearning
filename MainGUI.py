@@ -1,135 +1,102 @@
 import os
 import sys
-from tkinter import *
+import tkinter as tk
 from tkinter import filedialog, ttk, messagebox
 import configparser, webbrowser
 import math
+import torch
+import pandas as pd
 
 class TextEdit:
     def __init__(self, root):
         root.title(self.__class__.__name__)
         root.columnconfigure(0, weight=1)
+        root.columnconfigure(1, weight=1)
+        root.columnconfigure(2, weight=1)
+        root.columnconfigure(3, weight=1)
         root.rowconfigure(0, weight=1)
-
-        frame0 = Frame(root)
-        frame1 = Frame(root)
-        frame2 = Frame(root)
-        frame3 = Frame(root)
-
-        # 画面切り替えボタンのハンドラ関数
-        def change_no1():
-            frame1.tkraise() # frame1を前面に出す
-        def change_no2():
-            frame2.tkraise() # frame2を前面に出す
-        def change_no3():
-            frame3.tkraise() # frame3を前面に出す
-        def change_home():
-            frame0.tkraise() # frame0を前面に出す
+        root.rowconfigure(1, weight=1)
+        root.rowconfigure(2, weight=1)
+        root.rowconfigure(3, weight=1)
+        root.rowconfigure(4, weight=1)
+        root.rowconfigure(5, weight=1)
+        root.rowconfigure(6, weight=1)
+        root.rowconfigure(7, weight=1)
+        
+        self.count = 0
+        
         
         # ハンドラ関数
-        def click_get():
-            messagebox.showinfo('メッセージ', var.get())
+        def get_entry1():
+            messagebox.showinfo('メッセージ', entry1.get())
         
-        f0_btn1 = ttk.Button(frame0, text='データ読み込み', command=change_no1)
-        f0_btn2 = ttk.Button(frame0, text='統計解析', command=change_no2)
-        f0_btn3 = ttk.Button(frame0, text='機械学習', command=change_no3)
-
-        f1_btn1 = ttk.Button(frame1, text='ファイル選択', command=self.trainFileOpen)
-        f1_btn2 = ttk.Button(frame1, text='ファイル選択', command=self.testFileOpen)
-        f1_btn5 = ttk.Button(frame1, text='戻る', command=change_home)
-        f2_btn2 = ttk.Button(frame2, text='戻る', command=change_home)
-        f3_btn2 = ttk.Button(frame3, text='戻る', command=change_home)
-
-
-        # btn1 = ttk.Button(frame0, text='押してください!', command=self.button1Clicked)
-        # btn2 = ttk.Button(frame0, text='押してください!2', command=self.button1Clicked)
-        # btn3 = ttk.Button(frame0, text='次の画面', command=change_no2)
-        # btn1.pack(pady=20)
-
-
-
-        f1_txt1 = Entry(frame1, width=50)
-        # txt.pack(pady=20)
-        # ハンドラ関数
-        def click(event):
-            messagebox.showinfo('メッセージ', txt.get())
-
+        def get_combo1():
+            messagebox.showinfo('メッセージ', combo1.get())
+        
+        def get_radio1():
+            messagebox.showinfo('メッセージ', action[var.get()])
+        
+        def count_up():
+            # global count
+            self.count = self.count + 1
+            label1['text'] = str(self.count)
+            
+        weather = ('晴れ','曇り','雨')
+        
         # Labelウィジェットの生成
-        f0_label1 = Label(frame0, text='データ処理', foreground='red')
-        f0_label2 = Label(frame0, text='データ読み込み(trainとtestが別ファイル)', foreground='red')
-        f0_label3 = Label(frame0, text='統計解析', foreground='red')
-        f0_label4 = Label(frame0, text='機械学習', foreground='red')
-        # label = Label(frame0, text='ここをクリック', foreground='red')
-
-        f1_label1 = Label(frame1, text='データ読み込み(trainとtestが別ファイル)', foreground='red')
-        f1_label2 = Label(frame1, text='trainデータのパス', foreground='blue')
-        f1_label3 = Label(frame1, text='testデータのパス', foreground='blue')
-        self.f1_label4 = Label(frame1, text='trainデータのパス', foreground='black')
-        self.f1_label5 = Label(frame1, text='testデータのパス', foreground='black')
-        f2_label1 = Label(frame2, text='統計解析', foreground='red')
-        f3_label1 = Label(frame3, text='機械学習', foreground='red')
-
-        # Labelウィジェットの配置
-        # label.pack()
-        # ハンドラ関数を設定
-        # label.bind("<Button-1>", click)
+        label1 = tk.Label(root, text='Pytorch環境を確認', foreground='red')
+        label2 = tk.Label(root, text='データ読み込み', foreground='red')
+        self.label3 = tk.Label(root, text='trainデータパス', foreground='red')
+        self.label4 = tk.Label(root, text='testデータパス', foreground='red')
+        
+        
+        # Entryウィジェットの生成
+        entry1 = tk.Entry(width=20)
+        
+        # Buttonウィジェットの生成
+        button1 = tk.Button(root, text='Pytorch環境', command=self.check_pytorch)
+        button2 = tk.Button(root, text='trainデータ読み込み', command=self.trainFileOpen)
+        button3 = tk.Button(root, text='testデータ読み込み', command=self.testFileOpen)
+        # button1 = tk.Button(root, text='ボタン1', command=count_up)
+        # button2 = tk.Button(root, text='表示', command=get_entry1)
+        button98 = tk.Button(root, text='コンボ', command=get_combo1)
+        button99 = tk.Button(root, text='コンボ', command=get_radio1)
+        
+        # Comboウィジェットの生成
+        combo1 = ttk.Combobox(root, state='readonly', values=weather)
+        
+        
 
         action = ['選択肢1', '選択肢2', '選択肢3', '選択肢4']
-        # 選択状態を保持する変数（初期値を'選択肢1'にしている）
-        var = StringVar(value='選択肢1')
-        radio1 = Radiobutton(root, text=action[0], variable=var, value=action[0])
-        radio2 = Radiobutton(root, text=action[1], variable=var, value=action[1])
-        radio3 = Radiobutton(root, text=action[2], variable=var, value=action[2])
-        radio4 = Radiobutton(root, text=action[3], variable=var, value=action[3])
+        var = tk.IntVar(value=0)
+        radio1 = tk.Radiobutton(root, text=action[0], variable=var, value=0)
+        radio2 = tk.Radiobutton(root, text=action[1], variable=var, value=1)
+        radio3 = tk.Radiobutton(root, text=action[2], variable=var, value=2)
+        radio4 = tk.Radiobutton(root, text=action[3], variable=var, value=3)
 
         # Buttonウィジェットの生成と配置
-        btn4 = Button(frame0, text='表示', command=click_get)
+        # btn4 = tk.Button(root, text='表示', command=click_get)
 
         # grid関数でウィジェットを配置
-        # 画面0
-        frame0.grid(row=0, column=0, sticky=NSEW)
-        f0_label1.grid(row=0, column=0, sticky=W)
-        f0_label2.grid(row=1, column=0, sticky=W)
-        f0_btn1.grid(row=1, column=1, sticky=E)
-        f0_label3.grid(row=2, column=0, sticky=W)
-        f0_btn2.grid(row=2, column=1, sticky=E)
-        f0_label4.grid(row=3, column=0, sticky=W)
-        f0_btn3.grid(row=3, column=1, sticky=E)
-
-        # btn1.grid(row=4, column=2, sticky=E)
-        # txt.grid(row=4, column=3)
-        # label.grid(row=4, column=4, sticky=W)
-        # btn2.grid(row=5, column=0, sticky=E)
-        # btn3.grid(row=5, column=1, sticky=E)
-        # btn4.grid(row=5, column=2, sticky=E)
-        # radio1.grid(row=0, column=0, sticky=W)
-        # radio2.grid(row=0, column=1, sticky=W)
-        # radio3.grid(row=0, column=2, sticky=E)
-
-        # 画面1
-        frame1.grid(row=0, column=0, sticky=NSEW)
-        f1_label1.grid(row=0, column=0, columnspan=2, sticky=W)
-        f1_label2.grid(row=1, column=0, sticky=W)
-        f1_btn1.grid(row=1, column=1, sticky=W)
-        self.f1_label4.grid(row=1, column=2, sticky=W)
-        f1_label3.grid(row=2, column=0, sticky=W)
-        f1_btn2.grid(row=2, column=1, sticky=W)
-        self.f1_label5.grid(row=2, column=2, sticky=W)
-        f1_btn5.grid(row=5, column=0, sticky=E)
-
-        # 画面2
-        frame2.grid(row=0, column=0, sticky=NSEW)
-        f2_label1.grid(row=0, column=0, sticky=W)
-        f2_btn2.grid(row=1, column=0, sticky=E)
-
-        # 画面3
-        frame3.grid(row=0, column=0, sticky=NSEW)
-        f3_label1.grid(row=0, column=0, sticky=W)
-        f3_btn2.grid(row=1, column=0, sticky=E)
-
-        frame0.tkraise()
-
+        label1.grid(row=0, column=0, sticky=tk.E)
+        button1.grid(row=0, column=1, sticky=tk.E)
+        label2.grid(row=1, column=0, sticky=tk.N)
+        button2.grid(row=1, column=1, sticky=tk.S)
+        self.label3.grid(row=1, column=2, sticky=tk.S)
+        button3.grid(row=2, column=1, sticky=tk.S)
+        self.label4.grid(row=2, column=2, sticky=tk.S)
+        combo1.grid(row=5, column=1, sticky=tk.W)
+        button98.grid(row=5, column=2, sticky=tk.NSEW)
+        radio1.grid(row=6, column=0)
+        radio2.grid(row=6, column=1)
+        radio3.grid(row=6, column=2)
+        radio4.grid(row=6, column=3)
+        button99.grid(row=7, column=3, sticky=tk.NSEW)
+        # entry1.grid(row=1, column=1, sticky=tk.W)
+        # button1.grid(row=1, column=2, sticky=tk.E)
+        # button2.grid(row=1, column=3, sticky=tk.NSEW)
         
+
         
         
         self.fileTypes = [('csvファイル', '*.csv'), ('すべてのファイル','*.*')]
@@ -149,130 +116,25 @@ class TextEdit:
         root.geometry(clientWidth + 'x' + clientHeight)
         root.protocol('WM_DELETE_WINDOW', self.menuFileExit)
 
-        root.option_add('*tearOff', FALSE)
-        menu = Menu()
-        menuFile = Menu()
+        # root.option_add('*tearOff', FALSE)
+        menu = tk.Menu()
+        menuFile = tk.Menu()
         menu.add_cascade(menu=menuFile, label='ファイル(F)', underline=5)
-        menuFile.add_command(label='新規(N)', underline=3, command=self.menuFileNew)
-        # menuFile.add_command(label='開く(O)', underline=3, command=self.menuFileOpen)
-        menuFile.add_command(label='保存(S)', underline=3, command=self.menuFileSave)
-        menuFile.add_command(label='名前を付けてシフトJISで保存(A)', underline=16, command=self.menuFileSaveAsSjis)
-        menuFile.add_command(label='名前を付けてUTF-8で保存(U)', underline=15, command=self.menuFileSaveAsUtf8)
-        menuFile.add_separator()
+        # menuFile.add_separator()
         menuFile.add_command(label='終了(x)', underline=3, command=self.menuFileExit)
-        menuHelp = Menu()
+        menuHelp = tk.Menu()
         menu.add_cascade(menu=menuHelp, label='ヘルプ(H)', underline=4)
         menuHelp.add_command(label='バージョン情報(v)', underline=8, command=self.menuHelpVersion)
         root['menu'] = menu
     
-    def read_data(self):
-        pass
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    def menuFileNew(self):
-        self.textFilename = ''
-        self.text.delete('1.0', 'end')
-
-    def trainFileOpen(self):
-        filepath = filedialog.askopenfilename(filetypes=self.fileTypes, initialdir=self.directory)
-        if not filepath:
-            return
-        
-        data = ''
-        f = open(filepath, 'r')
-        data = f.read()
-        f.close()
-
-        if data == '':
-            messagebox.showwarning(self.__class__.__name__, 'ファイルを開けませんでした')
-        else:
-            self.trainFile = data # csvファイルの中身
-            self.trainFilePath = filepath
-            self.directory = filepath
-        
-        self.f1_label4.configure(text=filepath)
-        
-        
-    
-    def testFileOpen(self):
-        filepath = filedialog.askopenfilename(filetypes=self.fileTypes, initialdir=self.directory)
-        if not filepath:
-            return
-        
-        data = ''
-        f = open(filepath, 'r')
-        data = f.read()
-        f.close()
-
-        if data == '':
-            messagebox.showwarning(self.__class__.__name__, 'ファイルを開けませんでした')
-        else:
-            self.testFile = data # csvファイルの中身
-            self.testFilePath = filepath
-        
-        self.f1_label5.configure(text=filepath)
-
-    def menuFileSave(self):
-        self.fileSave(self.textFilename, self.isSjis)
-
-    def fileSave(self, saveFilename, saveIsSjis):
-        s = self.text.get('1.0', 'end')
-        if len(s) == 1:
-            messagebox.showwarning(self.__class__.__name__, '保存するテキストがありません')
-            return
-
-        if saveIsSjis == TRUE:
-            f = open(saveFilename, 'w')
-        else:
-            f = open(saveFilename, 'w', encoding='UTF-8')
-        f.write(s[:-1])
-        f.close()
-        self.isSjis = saveIsSjis
-        self.textFilename = saveFilename
-
-    def menuFileSaveAsSjis(self):
-        self.fileSaveAs(TRUE)
-
-    def menuFileSaveAsUtf8(self):
-        self.fileSaveAs(FALSE)
-
-    def fileSaveAs(self, saveIsSjis):
-        filename = filedialog.asksaveasfilename(
-            filetypes=self.fileTypes,
-            initialdir=self.directory,
-            initialfile=os.path.basename(self.textFilename))
-        if not filename:
-            return
-        self.fileSave(filename, saveIsSjis)
-    
     def menuHelpVersion(self):
         s = self.__class__.__name__
-        s += ' Version 0.01(2022/12/27)\n'
-        s += '©2022 Tomohiro K\n'
+        s += ' Version 0.01(2023/3/12)\n'
+        s += '©2023 Tomohiro K\n'
         s += 'with Python ' + sys.version
         messagebox.showinfo(self.__class__.__name__, s)
-    
+        
     def menuFileExit(self):
         cp = configparser.ConfigParser()
         cp['Client'] = {
@@ -284,10 +146,50 @@ class TextEdit:
             cp.write(f)
         root.destroy()
     
-    def button1Clicked(self, s):
-        messagebox.showinfo(root.title(), s)
+    def check_pytorch(self):
+        cpt = 'GPU available : ' + str(torch.cuda.is_available()) + '\n'
+        cpt += 'Pytorch version : ' +  torch.__version__ + '\n'
+        cpt += 'GPU count : ' + str(torch.cuda.device_count()) + '\n'
+        cpt += 'GPU index : ' + str(torch.cuda.current_device()) + '\n'
+        cpt += 'GPU device name : ' + torch.cuda.get_device_name() + '\n'
+        cpt += 'GPU device capability : ' + str(torch.cuda.get_device_capability())
+        messagebox.showinfo('Pytorch環境', cpt)
 
-root = Tk()
+    def trainFileOpen(self):
+        try:
+            filepath = filedialog.askopenfilename(filetypes=self.fileTypes, initialdir=self.directory)
+        except:
+            filepath = ''
+        
+        try:
+            train_data = pd.read_csv(filepath)
+            self.trainFile = train_data # csvファイルの中身
+            self.trainFilePath = filepath
+            self.directory = filepath
+        except:
+            messagebox.showwarning(self.__class__.__name__, 'ファイルを開けませんでした')
+        
+        self.label3.configure(text=filepath)
+    
+    def testFileOpen(self):
+        try:
+            filepath = filedialog.askopenfilename(filetypes=self.fileTypes, initialdir=self.directory)
+        except:
+            filepath = ''
+        
+        try:
+            train_data = pd.read_csv(filepath)
+            self.testnFile = train_data # csvファイルの中身
+            self.testFilePath = filepath
+            self.directory = filepath
+        except:
+            messagebox.showwarning(self.__class__.__name__, 'ファイルを開けませんでした')
+        
+        self.label4.configure(text=filepath)
+        
+
+
+root = tk.Tk()
 TextEdit(root)
 # print(root.children)
 root.mainloop()
