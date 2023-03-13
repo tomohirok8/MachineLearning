@@ -6,6 +6,9 @@ import configparser
 import torch
 import pandas as pd
 
+from MachineLearning import Light_GBM
+
+
 
 class TextEdit:
     def __init__(self, root):
@@ -141,7 +144,7 @@ class TextEdit:
     def menuHelpVersion(self):
         s = self.__class__.__name__
         s += ' Version 0.01(2023/3/12)\n'
-        s += '©2023 Tomohiro K\n'
+        s += '©2023 TK\n'
         s += 'with Python ' + sys.version
         messagebox.showinfo(self.__class__.__name__, s)
 
@@ -225,8 +228,19 @@ train_data, test_data, savedir = gui.readdata()
 
 
 
+# 目的変数列名指定
+target_name = 'quality'
 
+# 説明変数列名リスト
+explanatory_list = list(train_data.columns)
+explanatory_list.remove(target_name)
 
+### LightGBMで学習 ###
+# 説明変数と目的変数に分割
+X = train_data[explanatory_list]
+Y = train_data[target_name]
+
+df_lightGBM, best_parameters, feature_importance = Light_GBM(X, Y)
 
 
 
