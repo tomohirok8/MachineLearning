@@ -71,6 +71,7 @@ explanatory_list.remove(target_name)
 
 
 
+
 ############## 実行内容読み込み ##############
 df_exe = pd.read_csv('execution.csv', header=None, encoding='shift_jis')
 
