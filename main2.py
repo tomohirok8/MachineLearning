@@ -31,22 +31,23 @@ from IPython.display import Image
 import torch
 from torch import nn, optim
 import torch.nn.functional as F
+from torch.utils.data import Dataset, DataLoader
 
-os.chdir('D:\\GitHub\\DS3')
-from code.sub import check_pytorch
-from code.data_read import My_Data_Read
-from code.preprocessing import missing_value_variable, missing_value_sample, drop_missing, fill_missing, str_to_float,\
-                            str_to_numeric
-from code.analysis import plot_target_other, plot_target_other_mahalanobis, plot_hist, GraphicalLasso_correlation
-from code.outlier import outlier_MT, outlier_OCSVM1, outlier_OCSVM2
-from code.classification import hierarchical_cluster_analysis, kmeans_classification, GaussianMixtureModel_classification,\
-                            PrincipalComponentAnalysis_classification
-from code.MachineLearning import Multiple_Regression, Elastic_Net, Linear_Discriminant_Analysis,Support_Vector_Machine,\
-                            Decision_Tree, Random_Forest, Light_GBM
+os.chdir('D:/GitHub/DS3')
+from scripts.sub import check_pytorch
+from scripts.data_read import My_Data_Read
+# from scripts.preprocessing import missing_value_variable, missing_value_sample, drop_missing, fill_missing, str_to_float,\
+#                             str_to_numeric
+# from scripts.analysis import plot_target_other, plot_target_other_mahalanobis, plot_hist, GraphicalLasso_correlation
+# from scripts.outlier import outlier_MT, outlier_OCSVM1, outlier_OCSVM2
+# from scripts.classification import hierarchical_cluster_analysis, kmeans_classification, GaussianMixtureModel_classification,\
+#                             PrincipalComponentAnalysis_classification
+# from scripts.MachineLearning import Multiple_Regression, Elastic_Net, Linear_Discriminant_Analysis,Support_Vector_Machine,\
+#                             Decision_Tree, Random_Forest, Light_GBM
 
 
 
-# Pytorch環境を確認
+### Pytorch環境を確認 ###
 check_pytorch()
 
 # データ表示数のセッティング
@@ -57,8 +58,131 @@ pd.set_option('display.max_rows', None) # 全行表示されるようにPandas�
 
 ############## データを読み込んで変数名を取得 ##############
 # データ読み込み
-train_data, test_data = My_Data_Read.RedWineQuality()
+# train_data, test_data = My_Data_Read.SIG_mpg()
+# train_data, test_data = My_Data_Read.RedWineQuality()
+# x, y = My_Data_Read.Iris()
+# train_data, test_data = My_Data_Read.BitcoinPrice()
+df = My_Data_Read.flights_seaborn()
 
+
+############## 時系列データの前処理 ##############
+#訓練用、評価用、テスト用で呼び出すデータを変える
+seq_len = 36
+pred_len = 12
+batch_size = 1
+border1s = [0, 12 * 9 - seq_len, 12 * 11 - seq_len]
+border2s = [12 * 9, 12 * 11, 12 * 12]
+
+data = df[['passengers']].values
+ss = StandardScaler()
+data = ss.fit_transform(data)
+
+train_data = data[border1s[0]:border2s[0]]
+val_data = data[border1s[1]:border2s[1]]
+test_data = data[border1s[2]:border2s[2]]
+
+
+
+
+class AirPassengersDataset(Dataset):
+    def __init__(self, data, seq_len, pred_len):
+        #学習期間と予測期間の設定
+        self.seq_len = seq_len
+        self.pred_len = pred_len
+        self.data = data
+
+    def __getitem__(self, index):
+        #学習用の系列と予測用の系列を出力
+        s_begin = index
+        s_end = s_begin + self.seq_len
+        r_begin = s_end
+        r_end = r_begin + self.pred_len
+
+        src = self.data[s_begin:s_end]
+        tgt = self.data[r_begin:r_end]
+
+        return src, tgt
+    
+    def __len__(self):
+        return len(self.data) - self.seq_len - self.pred_len + 1
+
+
+train_set = AirPassengersDataset(data=train_data, seq_len=seq_len, pred_len=pred_len)
+val_set = AirPassengersDataset(data=val_data, seq_len=seq_len, pred_len=pred_len)
+test_set = AirPassengersDataset(data=train_data, seq_len=seq_len, pred_len=pred_len)
+
+
+#データをバッチごとに分けて出力できるDataLoaderを使用
+train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
+val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=True)
+test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=True)
+
+
+# モデル
+from transformer import Transformer
+#デバイスの設定
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+print(device)
+
+d_input = 1
+d_output = 1
+d_model = 512
+nhead = 8
+dim_feedforward = 2048
+num_encoder_layers = 1
+num_decoder_layers = 1
+dropout = 0.01
+model = Transformer(num_encoder_layers=num_encoder_layers,
+                    num_decoder_layers=num_decoder_layers,
+                    d_model=d_model,
+                    d_input=d_input, 
+                    d_output=d_output,
+                    dim_feedforward=dim_feedforward,
+                    dropout=dropout, nhead=nhead
+                   )
+
+for p in model.parameters():
+    if p.dim() > 1:
+        nn.init.xavier_uniform_(p)
+
+
+model = model.to(device)
+
+criterion = torch.nn.MSELoss()
+
+optimizer = torch.optim.RAdam(model.parameters(), lr=0.0001)
+
+
+# 学習実行
+from transformer import train, evaluate
+epochs = 100
+best_loss = float('Inf')
+best_model = None
+
+valid_losses = []
+for epoch in range(1, epochs + 1):
+    loss_train = train(model=model, data_provider=train_loader, optimizer=optimizer, criterion=criterion, device=device)
+    loss_valid = evaluate(flag='val', model=model, data_provider=val_loader, criterion=criterion, device=device)
+    if epoch%10==0:
+        print('[{}/{}] train loss: {:.2f}, valid loss: {:.2f}'.format(
+            epoch, epochs,
+            loss_train, loss_valid,
+        ))
+        
+    valid_losses.append(loss_valid)
+    if best_loss > loss_valid:
+        best_loss = loss_valid
+        best_model = model
+
+
+evaluate(flag='test', model=best_model, data_provider=test_loader, criterion=criterion, device=device)
+
+
+
+
+
+'''
+############## テーブルデータの前処理 ##############
 # 列名取得
 columns_list = list(train_data.columns)
 
@@ -334,3 +458,4 @@ df_lightGBM, best_parameters, feature_importance = Light_GBM(X, Y)
 
 
 
+'''
