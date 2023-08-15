@@ -36,6 +36,7 @@ from torch.utils.data import Dataset, DataLoader
 os.chdir('D:/GitHub/DS3')
 from scripts.sub import check_pytorch
 from scripts.data_read import My_Data_Read
+from scripts.data_arrange import arrange_flights_seaborn, arrange_flights_seaborn_Transformer
 # from scripts.preprocessing import missing_value_variable, missing_value_sample, drop_missing, fill_missing, str_to_float,\
 #                             str_to_numeric
 # from scripts.analysis import plot_target_other, plot_target_other_mahalanobis, plot_hist, GraphicalLasso_correlation
@@ -44,6 +45,7 @@ from scripts.data_read import My_Data_Read
 #                             PrincipalComponentAnalysis_classification
 # from scripts.MachineLearning import Multiple_Regression, Elastic_Net, Linear_Discriminant_Analysis,Support_Vector_Machine,\
 #                             Decision_Tree, Random_Forest, Light_GBM
+from scripts.transformer import Transformer, train, evaluate, train_flights_seaborn, evaluate_flights_seaborn
 
 
 
@@ -54,6 +56,9 @@ check_pytorch()
 pd.set_option('display.max_columns', None) # 全列表示されるようにPandasの設定を変更する
 pd.set_option('display.max_rows', None) # 全行表示されるようにPandasの設定を変更する
 
+#デバイスの設定
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+print(device)
 
 
 ############## データを読み込んで変数名を取得 ##############
@@ -65,65 +70,17 @@ pd.set_option('display.max_rows', None) # 全行表示されるようにPandas�
 df = My_Data_Read.flights_seaborn()
 
 
+
 ############## 時系列データの前処理 ##############
-#訓練用、評価用、テスト用で呼び出すデータを変える
-seq_len = 36
-pred_len = 12
-batch_size = 1
-border1s = [0, 12 * 9 - seq_len, 12 * 11 - seq_len]
-border2s = [12 * 9, 12 * 11, 12 * 12]
-
-data = df[['passengers']].values
-ss = StandardScaler()
-data = ss.fit_transform(data)
-
-train_data = data[border1s[0]:border2s[0]]
-val_data = data[border1s[1]:border2s[1]]
-test_data = data[border1s[2]:border2s[2]]
+SW_Arrange = 1
+if SW_Arrange == 0:
+    train_loader, val_loader, test_loader = arrange_flights_seaborn_Transformer(df)
+elif SW_Arrange == 1:
+    train_loader, val_loader, test_loader = arrange_flights_seaborn(df)
 
 
 
-
-class AirPassengersDataset(Dataset):
-    def __init__(self, data, seq_len, pred_len):
-        #学習期間と予測期間の設定
-        self.seq_len = seq_len
-        self.pred_len = pred_len
-        self.data = data
-
-    def __getitem__(self, index):
-        #学習用の系列と予測用の系列を出力
-        s_begin = index
-        s_end = s_begin + self.seq_len
-        r_begin = s_end
-        r_end = r_begin + self.pred_len
-
-        src = self.data[s_begin:s_end]
-        tgt = self.data[r_begin:r_end]
-
-        return src, tgt
-    
-    def __len__(self):
-        return len(self.data) - self.seq_len - self.pred_len + 1
-
-
-train_set = AirPassengersDataset(data=train_data, seq_len=seq_len, pred_len=pred_len)
-val_set = AirPassengersDataset(data=val_data, seq_len=seq_len, pred_len=pred_len)
-test_set = AirPassengersDataset(data=train_data, seq_len=seq_len, pred_len=pred_len)
-
-
-#データをバッチごとに分けて出力できるDataLoaderを使用
-train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
-val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=True)
-test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=True)
-
-
-# モデル
-from transformer import Transformer
-#デバイスの設定
-device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-print(device)
-
+############## Transformerによる学習 ##############
 d_input = 1
 d_output = 1
 d_model = 512
@@ -147,36 +104,47 @@ for p in model.parameters():
 
 
 model = model.to(device)
-
 criterion = torch.nn.MSELoss()
-
 optimizer = torch.optim.RAdam(model.parameters(), lr=0.0001)
 
 
 # 学習実行
-from transformer import train, evaluate
 epochs = 100
+early_stopping_rate = 10
 best_loss = float('Inf')
 best_model = None
 
+train_losses = []
 valid_losses = []
+early_stop_count = 0
 for epoch in range(1, epochs + 1):
-    loss_train = train(model=model, data_provider=train_loader, optimizer=optimizer, criterion=criterion, device=device)
-    loss_valid = evaluate(flag='val', model=model, data_provider=val_loader, criterion=criterion, device=device)
-    if epoch%10==0:
-        print('[{}/{}] train loss: {:.2f}, valid loss: {:.2f}'.format(
-            epoch, epochs,
-            loss_train, loss_valid,
-        ))
+    if SW_Arrange == 0:
+        loss_train = train(model=model, data_provider=train_loader, optimizer=optimizer, criterion=criterion, device=device)
+        loss_valid = evaluate(flag='val', model=model, data_provider=val_loader, criterion=criterion, device=device)
+    elif SW_Arrange == 1:
+        loss_train = train_flights_seaborn(model=model, data_provider=train_loader, optimizer=optimizer, criterion=criterion, device=device)
+        loss_valid = evaluate_flights_seaborn(flag='val', model=model, data_provider=val_loader, criterion=criterion, device=device)
+    if epoch % 10==0:
+        print('[{}/{}] train loss: {:.3f}, valid loss: {:.3f}'.format(epoch, epochs, loss_train, loss_valid))
         
+    train_losses.append(loss_train)
     valid_losses.append(loss_valid)
     if best_loss > loss_valid:
         best_loss = loss_valid
         best_model = model
+        early_stop_count = 0
+    else:
+        early_stop_count += 1
+    
+    if early_stop_count >= early_stopping_rate:
+        print('############## Early Stopping ##############')
+        print('[{}/{}] train loss: {:.3f}, valid loss: {:.3f}'.format(epoch, epochs, loss_train, loss_valid))
+        break
 
-
-evaluate(flag='test', model=best_model, data_provider=test_loader, criterion=criterion, device=device)
-
+if SW_Arrange == 0:
+    evaluate(flag='test', model=best_model, data_provider=test_loader, criterion=criterion, device=device)
+elif SW_Arrange == 1:
+    evaluate_flights_seaborn(flag='test', model=best_model, data_provider=test_loader, criterion=criterion, device=device)
 
 
 

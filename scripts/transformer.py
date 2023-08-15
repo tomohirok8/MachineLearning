@@ -39,6 +39,8 @@ class PositionalEncoding(nn.Module):
         x = x + self.pe[:, :x.size(1)]
         return self.dropout(x)
 
+
+
 #モデルに入力するために次元を拡張する
 class TokenEmbedding(nn.Module):
     def __init__(self, c_in, d_model):
@@ -50,14 +52,14 @@ class TokenEmbedding(nn.Module):
         return x
 
 
+
 class Transformer(nn.Module):
     def __init__(self, num_encoder_layers, num_decoder_layers,
-        d_model, d_input, d_output,
-        dim_feedforward = 512, dropout = 0.1, nhead = 8):
+                 d_model, d_input, d_output,
+                 dim_feedforward = 512, dropout = 0.1, nhead = 8):
         
         super(Transformer, self).__init__()
         
-
         #エンべディングの定義
         self.token_embedding_src = TokenEmbedding(d_input, d_model)
         self.token_embedding_tgt = TokenEmbedding(d_output, d_model)
@@ -96,7 +98,6 @@ class Transformer(nn.Module):
 
     def forward(self, src, tgt, mask_src, mask_tgt):
         #mask_src, mask_tgtはセルフアテンションの際に未来のデータにアテンションを向けないためのマスク
-        
         embedding_src = self.positional_encoding(self.token_embedding_src(src))
         memory = self.transformer_encoder(embedding_src, mask_src)
         
@@ -113,6 +114,7 @@ class Transformer(nn.Module):
         return self.transformer_decoder(self.positional_encoding(self.token_embedding_tgt(tgt)), memory, mask_tgt)
 
 
+
 def create_mask(src, tgt, device):
     
     seq_len_src = src.shape[1]
@@ -124,26 +126,31 @@ def create_mask(src, tgt, device):
     return mask_src, mask_tgt
 
 
+
 def generate_square_subsequent_mask(seq_len):
     mask = torch.triu(torch.full((seq_len, seq_len), float('-inf')), diagonal=1)
     return mask
 
-def train(model, data_provider, optimizer, criterion, device):
+
+
+def train_flights_seaborn(model, data_provider, optimizer, criterion, device):
     model.train()
     total_loss = []
     for src, tgt in data_provider:
         
         src = src.float().to(device)
         tgt = tgt.float().to(device)
+        # print(src.shape)
+        # print(tgt.shape)
+        # print(src[:,-1:,:].shape)
+        # print(tgt[:,:-1,:].shape)
 
         input_tgt = torch.cat((src[:,-1:,:],tgt[:,:-1,:]), dim=1)
+        # print(input_tgt.shape)
 
         mask_src, mask_tgt = create_mask(src, input_tgt, device)
 
-        output = model(
-            src=src, tgt=input_tgt, 
-            mask_src=mask_src, mask_tgt=mask_tgt
-        )
+        output = model(src=src, tgt=input_tgt, mask_src=mask_src, mask_tgt=mask_tgt)
 
         optimizer.zero_grad()
 
@@ -155,7 +162,8 @@ def train(model, data_provider, optimizer, criterion, device):
     return np.average(total_loss)
 
 
-def evaluate(flag, model, data_provider, criterion, device):
+
+def evaluate_flights_seaborn(flag, model, data_provider, criterion, device):
     model.eval()
     total_loss = []
     for src, tgt in data_provider:
@@ -186,10 +194,66 @@ def evaluate(flag, model, data_provider, criterion, device):
     if flag=='test':
         true = torch.cat((src, tgt), dim=1)
         pred = torch.cat((src, output), dim=1)
+        fig = plt.figure(figsize=(16,9))
         plt.plot(true.squeeze().cpu().detach().numpy(), linewidth=1, label='true')
         plt.plot(pred.squeeze().cpu().detach().numpy(), linewidth=3, label='pred')
         plt.legend()
-        plt.savefig('result/test.png')
+        fig.savefig('result/test_flights_seaborn.png')
+        
+    return np.average(total_loss)
+
+
+
+def train(model, data_provider, optimizer, criterion, device):
+    model.train()
+    total_loss = []
+    for src, tgt in data_provider:
+        
+        src = src.float().to(device)
+        tgt = tgt.float().to(device)
+        # print(src.shape)
+        # print(tgt.shape)
+
+        mask_src, mask_tgt = create_mask(src, tgt, device)
+
+        output = model(src=src, tgt=tgt, mask_src=mask_src, mask_tgt=mask_tgt)
+
+        optimizer.zero_grad()
+
+        loss = criterion(output, tgt)
+        loss.backward()
+        total_loss.append(loss.cpu().detach())
+        optimizer.step()
+        
+    return np.average(total_loss)
+
+
+
+def evaluate(flag, model, data_provider, criterion, device):
+    model.eval()
+    total_loss = []
+    k = 0
+    for src, tgt in data_provider:
+        k += 1
+        
+        src = src.float().to(device)
+        tgt = tgt.float().to(device)
+
+        mask_src, mask_tgt = create_mask(src, tgt, device)
+
+        output = model(src=src, tgt=tgt, mask_src=mask_src, mask_tgt=mask_tgt)
+
+        loss = criterion(output, tgt)
+        total_loss.append(loss.cpu().detach())
+        
+        if flag=='test':
+            for i in range(tgt.shape[0]):
+                x = list(range(src.shape[1]))
+                fig = plt.figure(figsize=(16,9))
+                plt.plot(x, tgt[i].squeeze(1).cpu().detach().numpy(), linewidth=1, label='true')
+                plt.plot(x, output[i].squeeze(1).cpu().detach().numpy(), linewidth=3, label='pred')
+                plt.legend()
+                fig.savefig('result/test' + str(k) + '_' + str(i+1) + '.png')
         
     return np.average(total_loss)
 
