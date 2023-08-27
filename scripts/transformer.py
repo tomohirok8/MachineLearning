@@ -214,9 +214,11 @@ def train(model, data_provider, optimizer, criterion, device):
         # print(src.shape)
         # print(tgt.shape)
 
-        mask_src, mask_tgt = create_mask(src, tgt, device)
+        input_tgt = src
 
-        output = model(src=src, tgt=tgt, mask_src=mask_src, mask_tgt=mask_tgt)
+        mask_src, mask_tgt = create_mask(src, input_tgt, device)
+
+        output = model(src=src, tgt=input_tgt, mask_src=mask_src, mask_tgt=mask_tgt)
 
         optimizer.zero_grad()
 
@@ -239,9 +241,18 @@ def evaluate(flag, model, data_provider, criterion, device):
         src = src.float().to(device)
         tgt = tgt.float().to(device)
 
-        mask_src, mask_tgt = create_mask(src, tgt, device)
+        input_tgt = src
 
-        output = model(src=src, tgt=tgt, mask_src=mask_src, mask_tgt=mask_tgt)
+        seq_len_src = src.shape[1]
+        mask_src = (torch.zeros(seq_len_src, seq_len_src)).type(torch.bool)
+        mask_src = mask_src.float().to(device)
+    
+        memory = model.encode(src, mask_src)
+    
+        mask_tgt = (generate_square_subsequent_mask(input_tgt.size(1))).to(device)
+    
+        output = model.decode(input_tgt, memory, mask_tgt)
+        output = model.output(output)
 
         loss = criterion(output, tgt)
         total_loss.append(loss.cpu().detach())

@@ -86,8 +86,8 @@ d_output = 1
 d_model = 512
 nhead = 8
 dim_feedforward = 2048
-num_encoder_layers = 1
-num_decoder_layers = 1
+num_encoder_layers = 2
+num_decoder_layers = 2
 dropout = 0.01
 model = Transformer(num_encoder_layers=num_encoder_layers,
                     num_decoder_layers=num_decoder_layers,
@@ -109,8 +109,8 @@ optimizer = torch.optim.RAdam(model.parameters(), lr=0.0001)
 
 
 # 学習実行
-epochs = 100
-early_stopping_rate = 10
+epochs = 300
+early_stopping_rate = 50
 best_loss = float('Inf')
 best_model = None
 
