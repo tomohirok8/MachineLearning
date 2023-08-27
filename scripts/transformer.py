@@ -98,12 +98,19 @@ class Transformer(nn.Module):
 
     def forward(self, src, tgt, mask_src, mask_tgt):
         #mask_src, mask_tgtはセルフアテンションの際に未来のデータにアテンションを向けないためのマスク
+        # print('src :', src.shape)
+        # print('tgt :', tgt.shape)
+        
         embedding_src = self.positional_encoding(self.token_embedding_src(src))
         memory = self.transformer_encoder(embedding_src, mask_src)
+        # print('embedding_src :', embedding_src.shape)
+        # print('memory :', memory.shape)
         
         embedding_tgt = self.positional_encoding(self.token_embedding_tgt(tgt))
         outs = self.transformer_decoder(embedding_tgt, memory, mask_tgt)
-        
+        # print('embedding_tgt :', embedding_tgt.shape)
+        # print('outs :', outs.shape)
+
         output = self.output(outs)
         return output
 
@@ -207,14 +214,16 @@ def evaluate_flights_seaborn(flag, model, data_provider, criterion, device):
 def train(model, data_provider, optimizer, criterion, device):
     model.train()
     total_loss = []
-    for src, tgt in data_provider:
+    for X, Y in data_provider:
+        # print(X.shape)
         
-        src = src.float().to(device)
-        tgt = tgt.float().to(device)
+        src = X[:,:,:2].float().to(device)
+        tgt = Y.float().to(device)
         # print(src.shape)
         # print(tgt.shape)
 
-        input_tgt = src
+        input_tgt = X[:,:,2].float().to(device).unsqueeze(2)
+        # print(tgt.shape)
 
         mask_src, mask_tgt = create_mask(src, input_tgt, device)
 
@@ -235,13 +244,13 @@ def evaluate(flag, model, data_provider, criterion, device):
     model.eval()
     total_loss = []
     k = 0
-    for src, tgt in data_provider:
+    for X, Y in data_provider:
         k += 1
         
-        src = src.float().to(device)
-        tgt = tgt.float().to(device)
+        src = X[:,:,:2].float().to(device)
+        tgt = Y.float().to(device)
 
-        input_tgt = src
+        input_tgt = X[:,:,2].float().to(device).to(device).unsqueeze(2)
 
         seq_len_src = src.shape[1]
         mask_src = (torch.zeros(seq_len_src, seq_len_src)).type(torch.bool)

@@ -72,7 +72,7 @@ df = My_Data_Read.flights_seaborn()
 
 
 ############## 時系列データの前処理 ##############
-SW_Arrange = 1
+SW_Arrange = 0
 if SW_Arrange == 0:
     train_loader, val_loader, test_loader = arrange_flights_seaborn_Transformer(df)
 elif SW_Arrange == 1:
@@ -81,7 +81,7 @@ elif SW_Arrange == 1:
 
 
 ############## Transformerによる学習 ##############
-d_input = 1
+d_input = 2
 d_output = 1
 d_model = 512
 nhead = 8
@@ -105,12 +105,12 @@ for p in model.parameters():
 
 model = model.to(device)
 criterion = torch.nn.MSELoss()
-optimizer = torch.optim.RAdam(model.parameters(), lr=0.0001)
+optimizer = torch.optim.RAdam(model.parameters(), lr=0.001)
 
 
 # 学習実行
-epochs = 300
-early_stopping_rate = 50
+epochs = 3000
+early_stopping_rate = 1000
 best_loss = float('Inf')
 best_model = None
 
