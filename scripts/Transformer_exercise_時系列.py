@@ -38,9 +38,7 @@ for r in df.iterrows():
     header_flg = True
 
 data = pd.DataFrame(l[1:], columns=l[0])
-
 close = np.array([int(str(i).replace(',', '')) for i in data['終値'].tolist() if i is not np.nan])
-
 close = close[::-1]
 
 logreturn = np.diff(np.log(close)) # 対数差分
@@ -49,7 +47,7 @@ csum_logreturn = logreturn.cumsum() # 累積和
 def get_org(x, csum_logreturn):
   return np.hstack((x[0], x[0]*np.exp(csum_logreturn)))
 
-y = np.log(2)
+
 
 fig, axs = plt.subplots(2, 1)
 axs[0].plot(close, color='orange')
@@ -62,15 +60,9 @@ axs[1].set_xlabel('日数')
 fig.tight_layout()
 plt.show()
 
-# Transformer
-input_window = 30
-output_window = 1
-batch_size = 16
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-print(torch.arange(0, 10, dtype=torch.float).unsqueeze(1).shape)
 
 
+##################### Transformer #####################
 class PositionalEncoding(nn.Module):
   def __init__(self, d_model, max_len=5000):
     super().__init__()
@@ -85,6 +77,7 @@ class PositionalEncoding(nn.Module):
   
   def forward(self, x):
     return self.dropout(x + self.pe[:x.size(0), :])
+
 
 
 class TransformerModel(nn.Module):
@@ -112,10 +105,15 @@ class TransformerModel(nn.Module):
       device = self.device
       mask = self._generate_square_subsequent_mask(len(src)).to(device)
       self.src_mask = mask
+    #   print('TransformerModel src_mask :', self.src_mask.shape)
     src = self.pos_encoder(src)
+    # print('TransformerModel src :', src.shape)
     output = self.transformer_encoder(src, self.src_mask)
+    # print('TransformerModel ENC output :', output.shape)
     output = self.decoder(output)
+    # print('TransformerModel DEC output :', output.shape)
     return output
+
 
 
 def create_inout_sequences(input_data, tw):
@@ -129,24 +127,27 @@ def create_inout_sequences(input_data, tw):
   return torch.FloatTensor(inout_seq)
 
 
+
 def get_data(data, split):
   series = data
   split = round(split*len(series))
-  
+#   print('get_data split :', split)
   train_data = series[:split]
   train_data = train_data.cumsum()
   train_data = 2 * train_data
+#   print('get_data train_data :', train_data.shape)
 
   test_data = series[split:]
   test_data = test_data.cumsum()
+#   print('get_data test_data :', test_data.shape)
 
   train_sequence = create_inout_sequences(train_data, input_window)
   test_sequence = create_inout_sequences(test_data, input_window)
+#   print('get_data train_sequence :', train_sequence.shape)
+#   print('get_data test_sequence :', test_sequence.shape)
   
   return train_sequence.to(device), test_sequence.to(device)
 
-
-torch.stack?
 
 
 def get_batch(source, i, batch_size):
@@ -154,11 +155,14 @@ def get_batch(source, i, batch_size):
   """
   seq_len = min(batch_size, len(source)-1-i)
   data = source[i:i+seq_len]
+#   print('get_batch seq_len :', seq_len)
+#   print('get_batch data :', data.shape)
 
   input = torch.stack(torch.stack([item[0] for item in data]).chunk(input_window, output_window))
   target  = torch.stack(torch.stack([item[1] for item in data]).chunk(input_window, output_window))
 
   return input, target
+
 
 
 def train(train_data):
@@ -168,6 +172,9 @@ def train(train_data):
 
   for batch, i in enumerate(range(0, len(train_data), batch_size)):
     data, targets = get_batch(train_data, i, batch_size)
+    # print('train data :', data.shape)
+    # print('train targets :', targets.shape)
+
     optimizer.zero_grad()
     output = model(data)
     loss = criterion(output, targets)
@@ -186,6 +193,7 @@ def train(train_data):
       start_time = time.time()
 
 
+
 def evaluate(eval_model, data_source):
   eval_model.eval()
   total_loss = 0.
@@ -200,6 +208,14 @@ def evaluate(eval_model, data_source):
   return total_loss/len(data_source)
 
 
+
+####### モデルの設定
+input_window = 30
+output_window = 1
+batch_size = 16
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(torch.arange(0, 10, dtype=torch.float).unsqueeze(1).shape)
+
 model = TransformerModel().to(device)
 
 criterion = nn.MSELoss()
@@ -208,12 +224,12 @@ lr = 0.00005
 optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma = 0.95)
 
-epochs = 100
+epochs = 30
 batch_size = 16
 
 train_data, val_data = get_data(logreturn, 0.6)
 
-# 学習
+####### 学習
 for epoch in range(1, epochs + 1):
   epoch_start_time = time.time()
   train(train_data)
@@ -222,13 +238,15 @@ for epoch in range(1, epochs + 1):
     val_loss = evaluate(model, val_data)
     print(f'val loss:{val_loss:5.7f}')
   
-  else:
+  elif epoch%10==0:
     print(f'{epoch}:epoch | time: {time.time() - epoch_start_time:5.2f} sec')
   
-  print('=====' * 80)
+  print('=====' * 10)
 
   scheduler.step()
 
+
+####### 検証
 def forecast_seq(model, sequences):
   model.eval()
   forecast_seq = torch.Tensor(0)
@@ -243,11 +261,7 @@ def forecast_seq(model, sequences):
 
   return forecast_seq, actual
 
-
-val_data.shape
-
 test_result, truth = forecast_seq(model, val_data)
-
 
 plt.plot(truth, color='red', alpha=0.7)
 plt.plot(test_result, color='blue', linewidth=0.7)
@@ -256,9 +270,5 @@ plt.legend(['Actual', 'Forecast'])
 plt.xlabel('Time step')
 plt.show()
 
-
-
-
 get_org([close[729]], test_result)
-
 get_org([close[729]], truth)
