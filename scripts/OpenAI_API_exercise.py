@@ -13,8 +13,7 @@ from llama_index import (GPTVectorStoreIndex, LLMPredictor, ServiceContext,
                          load_index_from_storage)
 
 # API key
-apikey = getpass.getpass(prompt = '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')
-apikey = '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'
+apikey = ''
 openai.api_key = apikey
 # llama index用に環境変数設定
 os.environ["OPENAI_API_KEY"] = apikey
