@@ -195,7 +195,7 @@ def LightGBM_Grid(X_train, Y_train, n_class, esr, rate_list, depth_list, leaves_
     plt.plot(best_result['valid_1']['multi_error'], label='valid')
     plt.xlabel('num of iteration')
     plt.ylabel('multi error')
-    plt.show()
+    plt.close()
     fig.savefig('LightGBM_learning.png', bbox_inches='tight')
 
     # モデルを保存
@@ -220,13 +220,13 @@ def LightGBM_Grid(X_train, Y_train, n_class, esr, rate_list, depth_list, leaves_
     plt.figure(figsize=(11,7))
     # sns.set(font='Yu Gothic')
     sns.barplot(data=feature_importance, x='importance', y='feature_name')
-    plt.show()
+    plt.close()
     plt.savefig('feature_importance.png')
 
     calc_time = datetime.datetime.now() - start_time
     print(calc_time)
 
-    return df_lightGBM, best_parameters, feature_importance
+    return df_lightGBM, best_parameters, feature_importance, best_model
 
 
 
