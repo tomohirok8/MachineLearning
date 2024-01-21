@@ -8,6 +8,7 @@ import datetime
 from sklearn.model_selection import KFold
 from sklearn.metrics import accuracy_score
 import lightgbm as lgb
+import optuna
 import pickle
 # from matplotlib import rcParams
 # rcParams['font.family'] = 'sans-serif'
@@ -16,7 +17,7 @@ import pickle
 # import cal_acc
 '''
 'objective' : 'regression',
-'objective' : 'binary', 
+'objective' : 'binary',
 'metric': {'mae'},
 'metric': {'mse'},
 'metric': {'binary_logloss'},
@@ -31,7 +32,7 @@ class LrSchedulingCallback(object):
         # 評価指標
         self.ave_latest_before = float('inf')
         self.cal_ave_latest_before = True
-    
+
     def __call__(self, env):
         # 現在の学習率を取得する
         current_lr = env.params.get('learning_rate')
@@ -76,7 +77,7 @@ class LrSchedulingCallback(object):
         update_params = {'learning_rate' : new_lr}
         env.model.reset_parameter(update_params)
         env.params.update(update_params)
-    
+
     @property
     def beforeiteration(self):
         # コールバックは各イテレーションの後に実行する
@@ -126,9 +127,9 @@ def LightGBM_Grid(X_train, Y_train, n_class, esr, rate_list, depth_list, leaves_
                     # トレーニングデータ」を学習用・検証用に分割
                     best_KF_score = 0
                     for _fold, (train_index, valid_index) in enumerate(kf.split(Y_train)):
-                        X_trn = X_train[train_index]
+                        X_trn = X_train.loc[train_index,:]
                         Y_trn = Y_train[train_index]
-                        X_val = X_train[valid_index]
+                        X_val = X_train.loc[valid_index,:]
                         Y_val = Y_train[valid_index]
 
                         # LightGBMの学習
@@ -140,9 +141,6 @@ def LightGBM_Grid(X_train, Y_train, n_class, esr, rate_list, depth_list, leaves_
                                         train_set = lgb_dataset_trn, 
                                         valid_sets = [lgb_dataset_trn, lgb_dataset_val], 
                                         num_boost_round = 10000, 
-                                        # early_stopping_rounds = esr, 
-                                        # verbose_eval = -1,
-                                        # evals_result = result_dic,
                                         callbacks = [lr_scheduler,
                                                      lgb.early_stopping(stopping_rounds=esr, verbose=True), # early_stopping用コールバック関数
                                                      lgb.record_evaluation(result_dic),
@@ -157,7 +155,7 @@ def LightGBM_Grid(X_train, Y_train, n_class, esr, rate_list, depth_list, leaves_
                         val_pred_prob = model.predict(X_val, num_iteration=model.best_iteration)
                         val_pred = np.argmax(val_pred_prob, axis=1)
                         # val_acc = acc_list[3]
-                        val_acc = accuracy_score(Y_val, val_pred)
+                        val_acc = accuracy_score(Y_val, val_pred)*100
 
                         # 学習率の取得
                         last_lr = model.params.get('learning_rate')
@@ -182,11 +180,11 @@ def LightGBM_Grid(X_train, Y_train, n_class, esr, rate_list, depth_list, leaves_
                                            }
                     
                     if count == 1 or count == int(total/5)*5 or count % (int(total/10)+1) == 0:
-                        print('{}/{} Best score: {:.3f}%'.format(count, total, best_score))
+                        print('{}/{} Best score: {:.1f}%'.format(count, total, best_score))
                         print(datetime.datetime.now() - start_time)
 
     print()
-    print('Best score: {:.3f}'.format(best_score))
+    print('Best score: {:.1f}%'.format(best_score))
     print('Best parameters: {}'.format(best_parameters))
 
     # 学習経過を表示
@@ -195,6 +193,7 @@ def LightGBM_Grid(X_train, Y_train, n_class, esr, rate_list, depth_list, leaves_
     plt.plot(best_result['valid_1']['multi_error'], label='valid')
     plt.xlabel('num of iteration')
     plt.ylabel('multi error')
+    plt.grid()
     plt.close()
     fig.savefig('LightGBM_learning.png', bbox_inches='tight')
 
@@ -205,8 +204,8 @@ def LightGBM_Grid(X_train, Y_train, n_class, esr, rate_list, depth_list, leaves_
     # 予測
     Y_pred_prob = best_model.predict(X_train)
     Y_pred = np.argmax(Y_pred_prob, axis=1)
-    df_lightGBM = pd.concat([pd.DataFrame(X_train), pd.DataFrame(Y_train)], axis=1)
-    df_lightGBM['予測'] = Y_pred
+    df_lightGBM = pd.concat([X_train, Y_train], axis=1)
+    df_lightGBM['predict'] = Y_pred
 
     # 特徴量の重要度出力
     importance_gain = best_model.feature_importance(importance_type='gain')
@@ -217,11 +216,11 @@ def LightGBM_Grid(X_train, Y_train, n_class, esr, rate_list, depth_list, leaves_
                                       })
     feature_importance = feature_importance.sort_values('importance', ascending=False)
 
-    plt.figure(figsize=(11,7))
+    fig = plt.figure(figsize=(11,7))
     # sns.set(font='Yu Gothic')
     sns.barplot(data=feature_importance, x='importance', y='feature_name')
     plt.close()
-    plt.savefig('feature_importance.png')
+    fig.savefig('feature_importance.png', bbox_inches='tight')
 
     calc_time = datetime.datetime.now() - start_time
     print(calc_time)
@@ -231,26 +230,26 @@ def LightGBM_Grid(X_train, Y_train, n_class, esr, rate_list, depth_list, leaves_
 
 
 ### LightGBMでOptuna ###
-def LightGBM_Optuna(X_train, Y_train, n_class, esr, rate_list, depth_list, leaves_list, min_leaf_list, LGBM_seed, LGBM_feature_fraction, KF_splits):
+def LightGBM_Optuna(X_train, Y_train, n_class, ES_rate, rate_list, depth_list, leaves_list, min_leaf_list, LGBM_seed, LGBM_feature_fraction, KF_splits):
     start_time = datetime.datetime.now()
 
     class Objective():
-        def __init__(self, study, savedir):
+        def __init__(self, study, ES_rate, KF_splits):
             self.direction = study.direction
             self.best_score = None
             self.best_model = None
-            self.directory_path = savedir
             self.best_result = None
-        
+            self.ES_rate = ES_rate
+            self.KF_splits = KF_splits
+
         def __call__(self, trial):
-            esr = 300
-            kf = KFold(n_splits=5, shuffle=True, random_state=0)
+            kf = KFold(n_splits=self.KF_splits, shuffle=True, random_state=0)
 
             # パラメータ
             params = {'objective' : 'multiclass',
                       'num_class' : n_class, # 多クラスのクラス数を指定
                       'metric': {'multi_error'},
-                      'early_stopping_rounds' : esr,   # early_stopping 回数指定
+                      'early_stopping_rounds' : self.ES_rate,   # early_stopping 回数指定
                       'learning_rate' : trial.suggest_uniform('learning_rate', 0.001, 0.2),
                       'max_depth' : trial.suggest_int('max_depth', 2, 20),
                       'num_leaves' : trial.suggest_int('num_leaves', 2, 50),
@@ -259,18 +258,18 @@ def LightGBM_Optuna(X_train, Y_train, n_class, esr, rate_list, depth_list, leave
                       'lambda_l2' : trial.suggest_loguniform('lambda_l2', 1e-3, 10.0),
                       'bagging_fraction' : trial.suggest_uniform('bagging_fraction', 0.1, 1.0),
                       'bagging_freq' : trial.suggest_int('bagging_freq', 1, 5),
-                      'seed': 2023,
-                      'feature_fraction' : 1.0,
+                      'seed': LGBM_seed,
+                      'feature_fraction' : LGBM_feature_fraction,
                       'force_col_wise' : True,
                       'verbose' : -1
                       }
-            
+
             # トレーニングデータ」を学習用・検証用に分割
             best_KF_score = 0
             for _fold, (train_index, valid_index) in enumerate(kf.split(Y_train)):
-                X_trn = X_train[train_index]
+                X_trn = X_train.loc[train_index,:]
                 Y_trn = Y_train[train_index]
-                X_val = X_train[valid_index]
+                X_val = X_train.loc[valid_index,:]
                 Y_val = Y_train[valid_index]
 
                 # LightGBMの学習
@@ -282,33 +281,86 @@ def LightGBM_Optuna(X_train, Y_train, n_class, esr, rate_list, depth_list, leave
                                 train_set = lgb_dataset_trn, 
                                 valid_sets = [lgb_dataset_trn, lgb_dataset_val], 
                                 num_boost_round = 10000, 
-                                early_stopping_rounds = esr, 
-                                verbose_eval = False,
-                                evals_result = result_dic,
+                                callbacks = [lgb.early_stopping(stopping_rounds=self.ES_rate, verbose=True), # early_stopping用コールバック関数
+                                                lgb.record_evaluation(result_dic),
+                                                lgb.log_evaluation(-1)]
                                 )
 
                 val_pred_prob = model.predict(X_val, num_iteration=model.best_iteration)
                 val_pred = np.argmax(val_pred_prob, axis=1)
                 # val_acc = acc_list[3]
-                val_acc = accuracy_score(Y_val.values, val_pred)
+                val_acc = accuracy_score(Y_val, val_pred)*100
 
                 # 最も良いスコアのパラメータとスコアを更新
                 if val_acc > best_KF_score:
                     best_KF_score = val_acc
-            
+                    best_KF_model = model
+                    best_KF_result = result_dic
+
             if self.best_score is None:
-                self.save_best_model(model, best_KF_score)
-            
+                self.save_best_model(best_KF_model, best_KF_score)
+
             if best_KF_score > self.best_score:
-                self.save_best_model(model, best_KF_score)
-                self.best_result = result_dic
-            
+                self.save_best_model(best_KF_model, best_KF_score)
+                self.best_result = best_KF_result
+
             return best_KF_score
-      
+
         def save_best_model(self, model, score):
           self.best_score = score
           self.best_model = model
           now_time = datetime.datetime.now()
           time_stamp = str(now_time.year) + str(now_time.month) + str(now_time.day) + str(now_time.hour) + str(now_time.min)
-          with open(self.directory_path + 'LGBM_OptunaBestModel_' + time_stamp + '.pickle', 'wb') as obj:
+          with open('Optuna_LGBM_BestModel_' + time_stamp + '.pickle', 'wb') as obj:
               pickle.dump(model, obj)
+    
+    # Optunaによる最適化
+    optuna_trial = 100
+    study = optuna.create_study(direction='maximize',
+                                storage='sqlite:///optuna.sql',
+                                study_name='lgbm-params',
+                                load_if_exists=True)
+    
+    objective = Objective(study, ES_rate, KF_splits)
+
+    study.optimize(objective, n_trials=optuna_trial)
+
+    # 最適なハイパーパラメータと精度の表示
+    print()
+    print('#'*50)
+    print('Best Hyperparameters :', study.best_params)
+    print('Best Accuracy :', study.best_value)
+
+    # 学習経過を表示
+    fig = plt.figure(figsize=(11,7))
+    plt.plot(objective.best_result['training']['multi_error'], label='train')
+    plt.plot(objective.best_result['valid_1']['multi_error'], label='valid')
+    plt.xlabel('num of iteration')
+    plt.ylabel('multi error')
+    plt.grid()
+    plt.close()
+    fig.savefig('Optuna_LightGBM_learning.png', bbox_inches='tight')
+
+    # 予測
+    Y_pred_prob = objective.best_model.predict(X_train)
+    Y_pred = np.argmax(Y_pred_prob, axis=1)
+    df_lightGBM = pd.concat([X_train, Y_train], axis=1)
+    df_lightGBM['predict'] = Y_pred
+
+    # 特徴量の重要度出力
+    importance_gain = objective.best_model.feature_importance(importance_type='gain')
+    importance_rate = np.array(importance_gain) / np.sum(np.array(importance_gain)) * 100
+    feature_importance = pd.DataFrame({'feature_name' : objective.best_model.feature_name(),
+                                       'importance' : importance_gain,
+                                       'rate' : importance_rate
+                                      })
+    feature_importance = feature_importance.sort_values('importance', ascending=False)
+
+    fig = plt.figure(figsize=(11,7))
+    # sns.set(font='Yu Gothic')
+    sns.barplot(data=feature_importance, x='importance', y='feature_name')
+    plt.close()
+    fig.savefig('Optuna_feature_importance.png', bbox_inches='tight')
+
+    calc_time = datetime.datetime.now() - start_time
+    print(calc_time)
